@@ -589,6 +589,10 @@ h1, h2, p { margin: 0; }
 .grade-avisos .lembrete { background: var(--superficie); }
 .grade-avisos .lembrete.atrasado { background: var(--vermelho-claro); }
 
+.aviso-conta-icone { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--amarelo-claro); border: 1px solid var(--amarelo-borda); color: var(--amarelo-texto); }
+.aviso-conta.relev-alta .aviso-conta-icone { background: var(--vermelho-claro); border-color: var(--vermelho-borda); color: var(--vermelho); }
+.aviso-conta-icone .icone { width: 17px; height: 17px; }
+
 /* ---------- Cartão de crédito e faturas ---------- */
 .neutro { color: var(--texto-2); }
 .aviso-cartao { padding: 10px 12px; border-radius: 12px; background: var(--roxo-claro); border: 1px solid var(--roxo-borda); color: var(--roxo-texto); font-size: 13px; font-weight: 600; }

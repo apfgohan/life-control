@@ -295,18 +295,37 @@ var Financeiro = (function () {
   }
 
   // ---------- Avisos (topo da página) ----------
+  // Aviso de conta recorrente em aberto: aparece 7 dias antes do vencimento e fica até ser paga ou dispensada.
+  function avisoConta(l) {
+    var hoje = UI.hoje(), d = UI.diasEntre(hoje, l.data), nome = Dados.nomeDoItem(l.itemId);
+    var quando = d < 0 ? (d === -1 ? 'Venceu ontem' : 'Venceu há ' + (-d) + ' dias') : d === 0 ? 'Vence hoje' : d === 1 ? 'Vence amanhã' : 'Faltam ' + d + ' dias';
+    return el('div', { class: 'lembrete aviso-conta ' + (d <= 0 ? 'relev-alta' : 'relev-media') + (d < 0 ? ' atrasado' : '') }, [
+      el('span', { class: 'aviso-conta-icone' }, UI.icone('carteira')),
+      el('button', { type: 'button', class: 'lembrete-corpo', title: 'Confirmar pagamento', onclick: function () { lancar(l); } }, [
+        el('span', { class: 'lembrete-titulo', text: nome + (d < 0 ? ' venceu no dia ' : ' a vencer no dia ') + UI.fmtDiaMes(l.data) }),
+        el('span', { class: 'lembrete-meta' }, [
+          el('span', { class: 'lembrete-prazo', text: quando }),
+          el('span', { text: l.valor ? UI.fmtMoeda(l.valor) : 'valor a definir' })
+        ])
+      ]),
+      UI.botao('Paguei', function () { lancar(l); }, 'btn-secundario btn-mini')
+    ]);
+  }
+
   function painelAvisos() {
-    var ativos = Dados.lembretesAtivos(), hoje = UI.hoje();
-    var urgentes = ativos.filter(function (l) { var s = Dados.situacaoLembrete(l, hoje); return s === 'atrasado' || s === 'hoje'; }).length;
+    var ativos = Dados.lembretesAtivos(), hoje = UI.hoje(), contas = Dados.contasAVencer(7);
+    var urgentes = ativos.filter(function (l) { var s = Dados.situacaoLembrete(l, hoje); return s === 'atrasado' || s === 'hoje'; }).length
+      + contas.filter(function (l) { return l.data <= hoje; }).length;
+    var total = ativos.length + contas.length;
     return el('section', { class: 'painel painel-avisos' + (urgentes ? ' urgente' : '') }, [
       el('div', { class: 'painel-lado-topo' }, [
-        el('h2', { class: 'secao-titulo' }, [UI.icone('sino'), 'Avisos', ativos.length ? el('span', { class: 'secao-contagem', text: ativos.length }) : null]),
+        el('h2', { class: 'secao-titulo' }, [UI.icone('sino'), 'Avisos', total ? el('span', { class: 'secao-contagem', text: total }) : null]),
         el('div', { class: 'pagina-acoes' }, [
           el('a', { class: 'link', href: '#/lembretes', text: ativos.length > 6 ? 'Ver todos (' + ativos.length + ')' : 'Ver todos' }),
           UI.botao('Novo aviso', function () { Lembretes.editar(); }, 'btn-secundario btn-mini', 'mais')
         ])
       ]),
-      ativos.length ? el('div', { class: 'grade-avisos' }, ativos.slice(0, 6).map(function (l) { return Lembretes.linha(l, true); }))
+      total ? el('div', { class: 'grade-avisos' }, contas.map(avisoConta).concat(ativos.slice(0, 6).map(function (l) { return Lembretes.linha(l, true); })))
         : el('p', { class: 'modal-desc', text: 'Nenhum aviso pendente para agora.' })
     ]);
   }

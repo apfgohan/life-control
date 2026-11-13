@@ -316,6 +316,15 @@ var Dados = (function () {
     return lista.sort(function (a, b) { return a.data === b.data ? (a.criadoEm || 0) - (b.criadoEm || 0) : (a.data < b.data ? -1 : 1); });
   }
 
+  // Contas recorrentes (gastos) ainda em aberto que vencem nos próximos `dias` dias ou já venceram neste mês.
+  function contasAVencer(dias) {
+    var hoje = UI.hoje(), limite = UI.somarDias(hoje, dias == null ? 7 : dias), mes = hoje.slice(0, 7), lista = [];
+    [mes, UI.somarMeses(mes, 1)].forEach(function (m) {
+      lancamentosDoMes(m).forEach(function (l) { if (l.virtual && l.data <= limite && tipoDoItem(l.itemId) === 'gasto') lista.push(l); });
+    });
+    return lista;
+  }
+
   // Totais do mês: realizado e previsto (o que ainda falta pagar/receber), por tipo e por categoria.
   function resumoDoMes(mes) {
     var r = { entradas: 0, gastos: 0, entradasPrevistas: 0, gastosPrevistos: 0, comprasNoCartao: 0, categorias: {}, itens: {} };
@@ -566,7 +575,7 @@ var Dados = (function () {
     tipoDoItem: tipoDoItem, nomeDoItem: nomeDoItem, corDoItem: corDoItem,
     salvarCategoria: salvarCategoria, excluirCategoria: excluirCategoria, salvarItem: salvarItem, excluirItem: excluirItem,
     lancamento: lancamento, salvarLancamento: salvarLancamento, excluirLancamento: excluirLancamento,
-    lancamentosDoMes: lancamentosDoMes, resumoDoMes: resumoDoMes, diasNoMes: diasNoMes,
+    contasAVencer: contasAVencer, lancamentosDoMes: lancamentosDoMes, resumoDoMes: resumoDoMes, diasNoMes: diasNoMes,
     missao: missao, missoes: missoes, salvarMissao: salvarMissao, excluirMissao: excluirMissao, saldoDaMissao: saldoDaMissao,
     saldoSaude: saldoSaude, ehGastoSaude: ehGastoSaude, ehAuxilioSaude: ehAuxilioSaude,
     lembrete: lembrete, salvarLembrete: salvarLembrete, concluirLembrete: concluirLembrete, excluirLembrete: excluirLembrete,
