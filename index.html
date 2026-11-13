@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f111b">
+  <title>Life Control</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="img/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/icone-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css?v=2026-11-13a">
+</head>
+<body>
+  <aside class="lateral" id="lateral">
+    <div class="lateral-marca">
+      <div class="lateral-marca-texto">
+        <div class="lateral-titulo">Life Control</div>
+        <div class="lateral-sub">Objetivos de vida</div>
+      </div>
+      <button type="button" class="btn-recolher" id="recolher-menu" aria-label="Recolher o menu" title="Recolher o menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>
+      </button>
+    </div>
+    <div id="lateral-perfil"></div>
+    <nav class="lateral-menu" id="menu">
+      <a href="#/financeiro" data-rota="financeiro" data-icone="carteira">Financeiro</a>
+      <a href="#/comparativos" data-rota="comparativos" data-icone="mala">Missões e Saúde</a>
+      <a href="#/lembretes" data-rota="lembretes" data-icone="sino">Lembretes</a>
+      <a href="#/metas" data-rota="metas" data-icone="alvo">Metas</a>
+      <a href="#/fisico" data-rota="fisico" data-icone="halter">Físico</a>
+      <a href="#/backup" data-rota="backup" data-icone="pasta">Backup</a>
+      <a href="#/configuracoes" data-rota="configuracoes" data-icone="engrenagem">Configurações</a>
+    </nav>
+    <div class="lateral-rodape"><div class="status-topo" id="status-dados"></div></div>
+  </aside>
+  <div class="lateral-fundo" id="lateral-fundo"></div>
+
+  <div class="principal">
+    <header class="topo">
+      <button type="button" class="btn-menu" id="abrir-menu" aria-label="Abrir o menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </button>
+      <div class="topo-marca">Life Control</div>
+      <div class="acoes-topo" id="acoes-topo"></div>
+    </header>
+
+    <div id="aviso-dados" class="aviso-dados-area"></div>
+    <main id="conteudo" class="conteudo"></main>
+  </div>
+
+  <!-- Firebase (login e nuvem). Sem internet ou sem configuração, o programa funciona só neste aparelho. -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script>window.VERSAO_APP = '2026-11-13a';</script>
+  <script src="js/firebase-config.js?v=2026-11-13a"></script>
+  <script src="js/ui.js?v=2026-11-13a"></script>
+  <script src="js/dados.js?v=2026-11-13a"></script>
+  <script src="js/patentes.js?v=2026-11-13a"></script>
+  <script src="js/nuvem.js?v=2026-11-13a"></script>
+  <script src="js/armazenamento.js?v=2026-11-13a"></script>
+  <script src="js/lembretes.js?v=2026-11-13a"></script>
+  <script src="js/financeiro.js?v=2026-11-13a"></script>
+  <script src="js/comparativos.js?v=2026-11-13a"></script>
+  <script src="js/metas.js?v=2026-11-13a"></script>
+  <script src="js/fisico.js?v=2026-11-13a"></script>
+  <script src="js/backup.js?v=2026-11-13a"></script>
+  <script src="js/configuracoes.js?v=2026-11-13a"></script>
+  <script src="js/app.js?v=2026-11-13a"></script>
+</body>
+</html>
