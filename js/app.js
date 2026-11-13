@@ -1,7 +1,7 @@
 // Navegação entre as páginas (rotas no endereço: #/financeiro, #/lembretes, ...).
 var App = (function () {
   var rotas = {
-    financeiro: Financeiro.render,
+    inicio: Financeiro.render,
     comparativos: Comparativos.render,
     lembretes: Lembretes.render,
     metas: Metas.render,
@@ -9,7 +9,7 @@ var App = (function () {
     backup: Backup.render,
     configuracoes: Configuracoes.render
   };
-  var ROTA_INICIAL = 'financeiro';
+  var ROTA_INICIAL = 'inicio'; // endereços antigos (#/financeiro) também caem aqui
   var ultimaRota = null;
 
   function render() {

@@ -134,12 +134,62 @@ var Configuracoes = (function () {
     ]);
   }
 
+  // ---------- Formas de pagamento ----------
+  function editarForma(id) {
+    var f = id ? Dados.forma(id) : null;
+    var nome = el('input', { type: 'text', value: f ? f.nome : '', placeholder: 'Ex.: Cartão de Crédito Nubank', maxLength: 60 });
+    var tipo = el('select', null, [['avista', 'À vista (PIX, débito, dinheiro…)'], ['cartao', 'Cartão de crédito']].map(function (o) {
+      return el('option', { value: o[0], text: o[1], selected: (f ? f.tipo : 'cartao') === o[0] });
+    }));
+    var fechamento = el('input', { type: 'number', min: 1, max: 31, value: f && f.fechamento ? f.fechamento : 3 });
+    var vencimento = el('input', { type: 'number', min: 1, max: 31, value: f && f.vencimento ? f.vencimento : 10 });
+    var linha = el('div', { class: 'campos-linha' }, [
+      UI.campo('Dia do fechamento', fechamento, 'Compras depois deste dia vão para a fatura seguinte.'),
+      UI.campo('Dia do vencimento', vencimento, 'Dia em que a fatura é paga.')
+    ]);
+    function ajustar() { linha.hidden = tipo.value !== 'cartao'; }
+    tipo.addEventListener('change', ajustar);
+    ajustar();
+    var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
+      if (!nome.value.trim()) { nome.focus(); return false; }
+      Dados.salvarForma({ nome: nome.value, tipo: tipo.value, fechamento: fechamento.value, vencimento: vencimento.value }, id);
+      App.atualizar();
+    } }];
+    if (f) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
+      UI.confirmar('Excluir "' + f.nome + '"? Se já houver lançamentos, ela só sai das listas e o histórico continua.', function () {
+        UI.aviso(Dados.excluirForma(f.id) === 'arquivado' ? 'Forma arquivada (o histórico foi mantido)' : 'Forma de pagamento excluída');
+        App.atualizar();
+      });
+    } });
+    UI.modal(f ? 'Editar forma de pagamento' : 'Nova forma de pagamento', [
+      UI.campo('Nome', nome), UI.campo('Tipo', tipo), linha,
+      el('span', { class: 'campo-ajuda', text: 'Mudar os dias do cartão vale para as próximas compras; as já lançadas mantêm a fatura em que estão.' })
+    ], botoes);
+  }
+
+  function painelFormas() {
+    return el('section', { class: 'painel' }, [
+      el('div', { class: 'painel-lado-topo' }, [
+        el('h2', { class: 'secao-titulo', text: 'Formas de pagamento' }),
+        UI.botao('Nova forma', function () { editarForma(); }, 'btn-secundario btn-mini', 'mais')
+      ]),
+      el('p', { class: 'modal-desc cfg-ajuda', text: 'Confira o dia do fechamento e do vencimento de cada cartão: é por eles que o programa sabe em qual fatura cada compra cai.' }),
+      el('div', { class: 'cfg-itens' }, Dados.formas().map(function (f) {
+        return el('button', { type: 'button', class: 'cfg-item', title: 'Editar', onclick: function () { editarForma(f.id); } }, [
+          el('span', { text: f.nome }),
+          f.tipo === 'cartao' ? el('span', { class: 'cfg-fixo', text: 'fecha dia ' + f.fechamento + ' · vence dia ' + f.vencimento }) : null
+        ]);
+      }))
+    ]);
+  }
+
   function render(raiz) {
     raiz.appendChild(el('div', { class: 'pagina-topo' }, el('div', null, [
       el('h1', { class: 'pagina-titulo', text: 'Configurações' }),
       el('div', { class: 'pagina-subtitulo', text: 'Perfil, categorias e contas fixas.' })
     ])));
     raiz.appendChild(painelPerfil());
+    raiz.appendChild(painelFormas());
     raiz.appendChild(painelCategorias('entrada', 'Entradas (fontes de renda)', 'Marque o salário como entrada fixa para ele aparecer todo mês no calendário.'));
     raiz.appendChild(painelCategorias('gasto', 'Gastos', 'Clique num item para renomear ou marcar como conta fixa (aluguel, internet…), com valor e dia do vencimento.'));
   }

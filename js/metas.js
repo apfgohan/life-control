@@ -74,7 +74,10 @@ var Metas = (function () {
         el('h1', { class: 'pagina-titulo', text: 'Metas' }),
         el('div', { class: 'pagina-subtitulo', text: 'Cada meta concluída rende XP e aproxima a próxima patente.' })
       ]),
-      el('div', { class: 'pagina-acoes' }, UI.botao('Nova meta', function () { editar(null, area === 'todas' ? null : area); }, 'btn-primario', 'mais'))
+      el('div', { class: 'pagina-acoes' }, [
+        UI.botao('Meta recorrente', function () { Habitos.editar(); }, 'btn-secundario', 'mais'),
+        UI.botao('Meta de longo prazo', function () { editar(null, area === 'todas' ? null : area); }, 'btn-primario', 'mais')
+      ])
     ]));
 
     raiz.appendChild(el('button', { type: 'button', class: 'painel faixa-patente', title: 'Ver minha patente', onclick: Patentes.abrir }, [
@@ -87,6 +90,8 @@ var Metas = (function () {
       r.proxima ? el('div', { class: 'faixa-patente-proxima' }, [Patentes.insignia(r.proxima.indice, 'media'), el('span', { text: r.proxima.nome })]) : null
     ]));
 
+    raiz.appendChild(Habitos.painelGerenciar());
+    raiz.appendChild(el('h2', { class: 'secao-titulo titulo-manual', text: 'Metas de longo prazo' }));
     raiz.appendChild(el('div', { class: 'segmentado segmentado-areas' }, [['todas', 'Todas']].concat(Dados.AREAS).map(function (a) {
       var n = todas.filter(function (m) { return !m.concluida && (a[0] === 'todas' || m.area === a[0]); }).length;
       return el('button', { type: 'button', class: area === a[0] ? 'ativo' : '', onclick: function () { area = a[0]; App.atualizar(); } }, [a[1], n ? el('span', { class: 'secao-contagem', text: n }) : null]);

@@ -579,6 +579,67 @@ h1, h2, p { margin: 0; }
 .cfg-novo { border-style: dashed; color: var(--texto-2); }
 .cfg-fixo { font-size: 12px; font-weight: 700; color: var(--amarelo-texto); }
 
+/* ---------- Avisos no topo da Página Inicial ---------- */
+.painel-avisos { border-left: 5px solid var(--amarelo); background: linear-gradient(180deg, var(--amarelo-claro), var(--superficie) 70%); border-color: var(--amarelo-borda); border-left-color: var(--amarelo); }
+.painel-avisos.urgente { border-left-color: var(--vermelho); border-color: var(--vermelho-borda); background: linear-gradient(180deg, var(--vermelho-claro), var(--superficie) 70%); }
+.painel-avisos .secao-titulo { font-size: 18px; }
+.painel-avisos .secao-titulo .icone { color: var(--amarelo-texto); }
+.painel-avisos.urgente .secao-titulo .icone { color: var(--vermelho); }
+.grade-avisos { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.grade-avisos .lembrete { background: var(--superficie); }
+.grade-avisos .lembrete.atrasado { background: var(--vermelho-claro); }
+
+/* ---------- Cartão de crédito e faturas ---------- */
+.neutro { color: var(--texto-2); }
+.aviso-cartao { padding: 10px 12px; border-radius: 12px; background: var(--roxo-claro); border: 1px solid var(--roxo-borda); color: var(--roxo-texto); font-size: 13px; font-weight: 600; }
+.cor-cartao { background: var(--roxo); border-radius: 3px; }
+.lanc-forma, .lanc-cartao, .lanc-pago { padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.lanc-forma { background: var(--superficie-3); color: var(--texto-2); }
+.lanc-cartao { background: var(--roxo-claro); color: var(--roxo-texto); }
+.lanc-pago { background: var(--verde-claro); color: var(--verde-texto); }
+.lanc.fatura .lanc-nome { color: var(--roxo-texto); }
+.fatura-situacao { font-size: 14px; font-weight: 700; color: var(--texto-2); align-self: center; }
+.cal-total.neutro { font-size: 11px; font-weight: 700; color: var(--roxo-texto); }
+.cal-item.no-cartao { color: var(--roxo-texto); }
+.cal-item.fatura { border-left-color: var(--roxo); color: var(--roxo-texto); background: var(--roxo-claro); }
+.cal-item.fatura.previsto { background: transparent; outline-color: var(--roxo-borda); }
+.cartao-credito { padding: 8px 0; border-bottom: 1px solid var(--borda); }
+.cartao-credito:last-child { border-bottom: 0; }
+.cartao-credito-nome { font-weight: 700; margin-bottom: 4px; }
+.cartao-credito-linha { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; background: none; font-size: 13px; color: var(--texto-2); text-align: left; }
+button.cartao-credito-linha { cursor: pointer; }
+button.cartao-credito-linha:hover span:first-child { color: var(--azul-escuro); }
+.cartao-credito-linha.vazia { color: var(--texto-3); }
+
+/* ---------- Metas recorrentes (diárias, semanais, mensais) ---------- */
+.cal-marcas { display: inline-flex; align-items: center; gap: 5px; }
+.cal-metas { padding: 0 5px; border-radius: 999px; background: var(--superficie-3); font-size: 10px; font-weight: 800; color: var(--texto-3); }
+.cal-metas.completa { background: var(--verde-claro); color: var(--verde-texto); }
+.secao-contagem.completa { background: var(--verde-claro); color: var(--verde-texto); }
+.habitos-colunas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 20px; align-items: start; }
+.habitos-grupo-titulo { font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.lista-habitos { display: flex; flex-direction: column; gap: 8px; }
+.habito { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie-2); }
+.habito.feito, .habito.completo { border-color: var(--verde-borda); background: var(--verde-claro); }
+.habito.inativo { opacity: .55; }
+.habito .btn-check { width: 34px; height: 34px; flex-shrink: 0; }
+.habito .btn-check .icone { width: 17px; height: 17px; }
+.btn-check.desligado { border-style: dashed; cursor: default; }
+.habito-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.habito-titulo { font-weight: 700; overflow-wrap: anywhere; }
+.habito-corpo:hover .habito-titulo { color: var(--azul-escuro); }
+.habito-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 600; color: var(--texto-2); }
+.habito-sequencia { color: var(--ouro); }
+.habito-contagem { font-weight: 800; white-space: nowrap; }
+.habito .barra { margin-top: 3px; }
+.dias-escolha { display: flex; flex-direction: column; gap: 8px; }
+.dias-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dia-chip { padding: 7px 12px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie-2); color: var(--texto-2); font-weight: 700; font-size: 13px; cursor: pointer; }
+.dia-chip.ativo { background: var(--gradiente); border-color: transparent; color: #fff; }
+.patente-fontes { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 10px; }
+.patente-fontes .metrica:nth-child(odd) { padding-left: 0; }
+.patente-fontes .metrica:nth-child(even) { border-right: 0; }
+
 /* ---------- Telas menores ---------- */
 @media (max-width: 1250px) {
   .fin-grade { grid-template-columns: 1fr; }
