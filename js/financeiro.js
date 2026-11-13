@@ -148,7 +148,7 @@ var Financeiro = (function () {
       App.atualizar();
     } });
 
-    UI.modal(existente ? 'Editar lançamento' : base.virtual ? 'Confirmar conta fixa' : 'Novo lançamento', [
+    UI.modal(existente ? 'Editar lançamento' : base.virtual ? 'Confirmar conta recorrente' : 'Novo lançamento', [
       ehFixo ? null : el('div', { class: 'segmentado' }, [btnGasto, btnEntrada]),
       UI.campo('Item', seletorItem),
       ajudaItem,
@@ -157,7 +157,7 @@ var Financeiro = (function () {
       UI.campo('Descrição', descricao),
       UI.campo('Missão', seletorMissao, 'Use quando o gasto ou a diária for de uma viagem a serviço.'),
       linhaPrevisto
-    ], botoes, { icone: 'carteira', subtitulo: base.virtual ? 'Ajuste o valor e a data, se forem diferentes do previsto.' : ehFixo ? 'Conta fixa de ' + UI.nomeMes(origem.mesFixo).toLowerCase() : 'Entradas e gastos do dia a dia.' });
+    ], botoes, { icone: 'carteira', subtitulo: base.virtual ? (base.valor ? 'Ajuste o valor e a data, se forem diferentes do previsto.' : 'Informe o valor desta conta neste mês.') : ehFixo ? 'Conta fixa de ' + UI.nomeMes(origem.mesFixo).toLowerCase() : 'Entradas e gastos do dia a dia.' });
     if (!origem.valor) valor.focus();
   }
 
@@ -221,11 +221,11 @@ var Financeiro = (function () {
           forma && !cartao ? el('span', { class: 'lanc-forma', text: forma }) : null,
           cartao ? el('span', { class: 'lanc-cartao', text: forma + (l.parcelas > 1 ? ' · ' + l.parcelas + 'x' : '') + ' · fatura de ' + UI.fmtDiaMes(l.primeiraFatura) }) : null,
           m ? el('span', { class: 'lanc-missao', text: m.nome }) : null,
-          previsto ? el('span', { class: 'lanc-previsto', text: l.virtual ? 'Conta fixa' : 'Previsto' }) : null
+          previsto ? el('span', { class: 'lanc-previsto', text: l.virtual ? 'Conta recorrente' : 'Previsto' }) : null
         ])
       ]),
       el('span', { class: 'lanc-valor ' + (cartao ? 'neutro' : entrada ? 'positivo' : 'negativo'), title: cartao ? 'Compra no cartão: o gasto entra na fatura' : null,
-        text: cartao ? UI.fmtMoeda(l.valor) : (entrada ? '+' : '−') + UI.fmtMoeda(l.valor) }),
+        text: l.virtual && !l.valor ? 'valor a definir' : cartao ? UI.fmtMoeda(l.valor) : (entrada ? '+' : '−') + UI.fmtMoeda(l.valor) }),
       previsto ? UI.botao(entrada ? 'Recebi' : 'Paguei', function () {
         if (l.virtual) { lancar(l); return; }
         Dados.salvarLancamento({ data: l.data, itemId: l.itemId, valor: l.valor, descricao: l.descricao, status: 'realizado', missaoId: l.missaoId }, l.id);

@@ -165,7 +165,7 @@ var Dados = (function () {
     salvar();
     return true;
   }
-  // campos.fixo: null ou { valor, dia }. O mês de início de uma conta fixa nova é o mês atual.
+  // campos.fixo: null ou { valor (0 se variável), dia }. O mês de início de uma conta fixa nova é o mês atual.
   function salvarItem(campos, id) {
     var i = id ? item(id) : null;
     if (!i) {
@@ -175,8 +175,9 @@ var Dados = (function () {
     i.nome = texto(campos.nome) || 'Item';
     if (campos.papel !== undefined) i.papel = tipoDoItem(i.id) === 'entrada' && (campos.papel === 'diaria' || campos.papel === 'auxilio-saude') ? campos.papel : null;
     if (campos.fixo !== undefined) {
-      if (campos.fixo && campos.fixo.valor > 0) {
-        i.fixo = { valor: campos.fixo.valor, dia: Math.max(1, Math.min(31, Math.round(campos.fixo.dia) || 1)), desde: (i.fixo && i.fixo.desde) || UI.hoje().slice(0, 7) };
+      // valor 0 = conta recorrente de valor variável (energia, água…): aparece todo mês, sem valor previsto.
+      if (campos.fixo) {
+        i.fixo = { valor: campos.fixo.valor > 0 ? campos.fixo.valor : 0, dia: Math.max(1, Math.min(31, Math.round(campos.fixo.dia) || 1)), desde: (i.fixo && i.fixo.desde) || UI.hoje().slice(0, 7) };
       } else i.fixo = null;
     }
     if (campos.arquivado !== undefined) i.arquivado = !!campos.arquivado;
@@ -303,7 +304,10 @@ var Dados = (function () {
     var lista = db.lancamentos.filter(function (l) { return l.data && l.data.slice(0, 7) === mes && !l.pulado; });
     lista = lista.concat(faturas(function (data) { return data.slice(0, 7) === mes; }));
     var quitados = {};
-    db.lancamentos.forEach(function (l) { if (l.mesFixo === mes) quitados[l.itemId] = true; });
+    // Também vale um lançamento comum do mesmo item feito no mês (ex.: conta paga adiantada, antes do vencimento).
+    db.lancamentos.forEach(function (l) {
+      if (l.mesFixo ? l.mesFixo === mes : (l.data && l.data.slice(0, 7) === mes)) quitados[l.itemId] = true;
+    });
     db.itens.forEach(function (i) {
       if (!i.fixo || i.arquivado || quitados[i.id] || mes < i.fixo.desde) return;
       var dia = Math.min(i.fixo.dia, diasNoMes(mes));

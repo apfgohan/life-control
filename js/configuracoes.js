@@ -77,7 +77,10 @@ var Configuracoes = (function () {
     var papel = el('select', null, [['', 'Entrada comum'], ['diaria', 'Diária de missão'], ['auxilio-saude', 'Auxílio Saúde (reembolso)']].map(function (o) {
       return el('option', { value: o[0], text: o[1], selected: ((i && i.papel) || '') === o[0] });
     }));
-    var linhaFixo = el('div', { class: 'campos-linha' }, [UI.campo('Valor de todo mês (R$)', valor), UI.campo(entrada ? 'Dia do recebimento' : 'Dia do vencimento', dia)]);
+    var linhaFixo = el('div', { class: 'campos-linha' }, [
+      UI.campo('Valor de todo mês (R$)', valor, 'Deixe em branco se o valor muda a cada mês (energia, água…).'),
+      UI.campo(entrada ? 'Dia do recebimento' : 'Dia do vencimento', dia)
+    ]);
     function ajustar() { linhaFixo.hidden = !fixo.checked; }
     fixo.addEventListener('change', ajustar);
     ajustar();
@@ -85,8 +88,8 @@ var Configuracoes = (function () {
     var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
       if (!nome.value.trim()) { nome.focus(); return false; }
       var v = UI.lerValor(valor.value);
-      if (fixo.checked && !(v > 0)) { UI.aviso('Informe o valor de todo mês.'); valor.focus(); return false; }
-      Dados.salvarItem({ nome: nome.value, categoriaId: c.id, papel: entrada ? papel.value : null, fixo: fixo.checked ? { valor: v, dia: Number(dia.value) || 1 } : null }, id);
+      if (fixo.checked && valor.value.trim() && !(v > 0)) { UI.aviso('Valor inválido. Deixe em branco se ele varia.'); valor.focus(); return false; }
+      Dados.salvarItem({ nome: nome.value, categoriaId: c.id, papel: entrada ? papel.value : null, fixo: fixo.checked ? { valor: v > 0 ? v : 0, dia: Number(dia.value) || 1 } : null }, id);
       App.atualizar();
     } }];
     if (i) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
@@ -98,9 +101,9 @@ var Configuracoes = (function () {
     UI.modal(i ? 'Editar item' : 'Novo item em ' + c.nome, [
       UI.campo('Nome', nome),
       entrada ? UI.campo('Tipo', papel, 'Diárias e Auxílio Saúde entram nas comparações da página Missões e Saúde.') : null,
-      el('label', { class: 'campo-check' }, [fixo, el('span', { text: entrada ? 'Entrada fixa: repete todo mês' : 'Conta fixa: repete todo mês' })]),
+      el('label', { class: 'campo-check' }, [fixo, el('span', { text: entrada ? 'Entrada recorrente: repete todo mês' : 'Conta recorrente: repete todo mês' })]),
       linhaFixo,
-      el('span', { class: 'campo-ajuda', text: 'Itens fixos aparecem como previstos no calendário, no dia marcado, até você confirmar o pagamento ou recebimento.' })
+      el('span', { class: 'campo-ajuda', text: 'Itens recorrentes aparecem como previstos no calendário, no dia marcado, até você confirmar o pagamento ou recebimento.' })
     ], botoes);
   }
 
@@ -117,7 +120,7 @@ var Configuracoes = (function () {
         return el('button', { type: 'button', class: 'cfg-item', title: 'Editar item', onclick: function () { editarItem(i.id); } }, [
           el('span', { text: i.nome }),
           i.papel === 'diaria' ? UI.selo('Diária', 'info') : i.papel === 'auxilio-saude' ? UI.selo('Auxílio Saúde', 'info') : null,
-          i.fixo ? el('span', { class: 'cfg-fixo', text: UI.fmtMoeda(i.fixo.valor) + ' · todo dia ' + i.fixo.dia }) : null
+          i.fixo ? el('span', { class: 'cfg-fixo', text: (i.fixo.valor ? UI.fmtMoeda(i.fixo.valor) : 'valor variável') + ' · todo dia ' + i.fixo.dia }) : null
         ]);
       }).concat([el('button', { type: 'button', class: 'cfg-item cfg-novo', onclick: function () { editarItem(null, c.id); } }, [UI.icone('mais'), 'Novo item'])]))
     ]);
