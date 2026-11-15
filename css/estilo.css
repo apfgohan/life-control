@@ -394,114 +394,9 @@ h1, h2, p { margin: 0; }
 .segmentado button.ativo .secao-contagem { background: rgba(255, 255, 255, .22); color: #fff; }
 .segmentado-areas { margin-bottom: 16px; }
 
-/* ---------- Financeiro: cabeçalho e cartões ---------- */
-.seletor-mes { display: flex; align-items: center; gap: 8px; }
-.seletor-mes .pagina-titulo { min-width: 0; }
-.btn-mes { width: 36px; height: 36px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto-2); border-radius: 10px; }
-.btn-mes:disabled { opacity: .35; cursor: default; }
-.cartoes-fin { margin-bottom: 20px; }
-.cartao-icone.positivo { background: var(--verde-claro); color: var(--verde-texto); }
-.cartao-icone.negativo { background: var(--vermelho-claro); color: var(--vermelho); }
-.cartao-detalhe { font-size: 12px; font-weight: 600; color: var(--texto-3); margin-top: 2px; }
-.cartao-comparacao { display: block; padding: 18px; }
-.cartoes-fin .cartao-comparacao { grid-column: span 2; }
-
-.fin-grade { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
-.fin-principal, .fin-lado { min-width: 0; }
-.painel-lado { padding: 18px; }
-.painel-lado-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+/* ---------- Painéis com título e ações ---------- */
+.painel-lado-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .painel-lado-topo .secao-titulo { margin-bottom: 0; }
-
-/* ---------- Calendário ---------- */
-.painel-calendario { padding: 14px; }
-.calendario { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.cal-cabecalho { padding: 4px 0 6px; text-align: center; font-size: 12px; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .04em; }
-.cal-dia {
-  display: flex; flex-direction: column; gap: 2px; min-height: 112px; padding: 8px; min-width: 0;
-  border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie-2);
-  text-align: left; cursor: pointer; transition: border-color .15s, background .15s;
-}
-.cal-dia:hover { border-color: var(--azul-borda); background: var(--superficie-3); }
-.cal-dia.fora { background: transparent; border-style: dashed; border-color: var(--borda); opacity: .4; cursor: default; }
-.cal-dia.hoje { border-color: var(--azul); box-shadow: 0 0 0 1px var(--azul) inset; }
-.cal-topo { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
-.cal-numero { font-weight: 800; font-size: 14px; color: var(--texto-2); }
-.cal-dia.hoje .cal-numero { color: #fff; background: var(--azul); border-radius: 999px; padding: 0 7px; }
-.cal-lembretes { display: inline-flex; gap: 3px; }
-.cal-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--azul); }
-.cal-ponto.relev-alta { background: var(--vermelho); }
-.cal-ponto.relev-media { background: var(--amarelo); }
-.cal-ponto.concluido { background: var(--texto-3); opacity: .6; }
-.cal-total { font-size: 13px; font-weight: 800; line-height: 1.25; }
-.cal-itens { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; min-width: 0; }
-.cal-item { padding: 1px 6px; border-left: 3px solid; border-radius: 4px; background: var(--superficie); font-size: 11px; font-weight: 600; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-item.previsto { background: transparent; outline: 1px dashed var(--borda-forte); outline-offset: -1px; color: var(--texto-3); }
-.cal-mais { font-size: 11px; font-weight: 600; color: var(--texto-3); }
-.cal-lembrete-texto { margin-top: auto; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--azul-escuro); }
-.cal-lembrete-texto.relev-alta { color: var(--vermelho); }
-.cal-lembrete-texto.relev-media { color: var(--amarelo-texto); }
-
-/* ---------- Lançamentos ---------- */
-.lista-lanc { display: flex; flex-direction: column; }
-.lanc { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--borda); }
-.lanc:last-child { border-bottom: 0; }
-.lanc-data { width: 44px; flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--texto-3); }
-.lanc-cor { width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%; }
-.lanc-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
-.lanc-corpo:hover .lanc-nome { color: var(--azul-escuro); }
-.lanc-nome { font-weight: 700; }
-.lanc-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--texto-3); font-weight: 600; }
-.lanc-missao, .lanc-previsto { padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.lanc-missao { background: var(--teal-claro); color: var(--teal); }
-.lanc-previsto { background: var(--amarelo-claro); color: var(--amarelo-texto); }
-.lanc-valor { font-weight: 800; white-space: nowrap; }
-.lanc.previsto .lanc-valor, .lanc.previsto .lanc-nome { opacity: .7; }
-.dia-totais { display: flex; gap: 16px; font-weight: 800; font-size: 17px; }
-.dia-secao { margin: 6px 0 0; }
-
-/* ---------- Categorias (painel lateral) ---------- */
-.cat { padding: 8px 0; border-bottom: 1px solid var(--borda); }
-.cat:last-child { border-bottom: 0; }
-.cat summary { display: flex; flex-direction: column; gap: 6px; cursor: pointer; list-style: none; }
-.cat summary::-webkit-details-marker { display: none; }
-.cat-linha { display: flex; align-items: center; gap: 8px; }
-.cat-nome { flex: 1; font-weight: 700; }
-.cat-valor { font-weight: 800; }
-.cat-previsto { font-size: 12px; font-weight: 600; color: var(--amarelo-texto); }
-.cat-itens { margin-top: 8px; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-.cat-item { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--texto-2); }
-
-/* ---------- Comparações (diárias × gastos, auxílio × saúde) ---------- */
-.comparacao { padding: 8px 0; }
-.comparacao-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.comparacao-nome { font-weight: 700; }
-.comparacao-saldo { font-size: 18px; font-weight: 800; white-space: nowrap; }
-.comparacao-detalhe { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--texto-2); margin-top: 2px; }
-.comparacao-divisor { height: 1px; background: var(--borda); margin: 6px 0; }
-.cartao-comparacao .comparacao { padding: 0; }
-.cartao-comparacao .comparacao-saldo { font-size: 24px; }
-
-.lista-missoes { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
-.missao { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); }
-.missao summary { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; cursor: pointer; list-style: none; }
-.missao summary::-webkit-details-marker { display: none; }
-.missao-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.missao-nome { font-size: 18px; font-weight: 800; }
-.missao-meta { font-size: 13px; font-weight: 600; color: var(--texto-2); }
-.missao-saldo { display: flex; flex-direction: column; align-items: flex-end; }
-.missao-saldo strong { font-size: 22px; font-weight: 800; white-space: nowrap; }
-.missao-saldo-rotulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--texto-2); }
-.missao-numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.missao-numeros .metrica:first-child { padding-left: 0; }
-.missao-corpo { padding: 4px 20px 18px; border-top: 1px solid var(--borda); display: flex; flex-direction: column; gap: 12px; }
-
-.tabela { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-.tabela th, .tabela td { padding: 9px 10px; border-bottom: 1px solid var(--borda); text-align: left; }
-.tabela th { font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .04em; }
-.tabela .num { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.tabela tfoot td { border-bottom: 0; border-top: 2px solid var(--borda-forte); font-weight: 800; }
-.tabela .linha-vazia td { color: var(--texto-3); }
-.tabela .linha-vazia .num { color: var(--texto-3); font-weight: 500; }
 
 /* ---------- Lembretes ---------- */
 .lista-lembretes { display: flex; flex-direction: column; gap: 8px; }
@@ -565,20 +460,6 @@ h1, h2, p { margin: 0; }
 .promocao { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; text-align: center; }
 .promocao-texto { font-weight: 600; color: var(--texto-2); }
 
-/* ---------- Configurações ---------- */
-.cfg-ajuda { margin-bottom: 14px; }
-.cfg-lista { display: flex; flex-direction: column; gap: 12px; }
-.cfg-categoria { padding: 12px 14px; border: 1px solid var(--borda); border-left: 5px solid; border-radius: 14px; background: var(--superficie-2); }
-.cfg-categoria-topo { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.cfg-categoria-nome { font-size: 16px; font-weight: 800; }
-.cfg-espaco { flex: 1; }
-.cfg-itens { display: flex; flex-wrap: wrap; gap: 8px; }
-.cfg-item { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--borda); border-radius: 10px; background: var(--superficie); font-weight: 600; font-size: 14px; cursor: pointer; }
-.cfg-item:hover { border-color: var(--azul); }
-.cfg-item .icone { width: 14px; height: 14px; }
-.cfg-novo { border-style: dashed; color: var(--texto-2); }
-.cfg-fixo { font-size: 12px; font-weight: 700; color: var(--amarelo-texto); }
-
 /* ---------- Avisos no topo da Página Inicial ---------- */
 .painel-avisos { border-left: 5px solid var(--amarelo); background: linear-gradient(180deg, var(--amarelo-claro), var(--superficie) 70%); border-color: var(--amarelo-borda); border-left-color: var(--amarelo); }
 .painel-avisos.urgente { border-left-color: var(--vermelho); border-color: var(--vermelho-borda); background: linear-gradient(180deg, var(--vermelho-claro), var(--superficie) 70%); }
@@ -589,36 +470,6 @@ h1, h2, p { margin: 0; }
 .grade-avisos .lembrete { background: var(--superficie); }
 .grade-avisos .lembrete.atrasado { background: var(--vermelho-claro); }
 
-.aviso-conta-icone { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--amarelo-claro); border: 1px solid var(--amarelo-borda); color: var(--amarelo-texto); }
-.aviso-conta.relev-alta .aviso-conta-icone { background: var(--vermelho-claro); border-color: var(--vermelho-borda); color: var(--vermelho); }
-.aviso-conta-icone .icone { width: 17px; height: 17px; }
-
-/* ---------- Cartão de crédito e faturas ---------- */
-.neutro { color: var(--texto-2); }
-.aviso-cartao { padding: 10px 12px; border-radius: 12px; background: var(--roxo-claro); border: 1px solid var(--roxo-borda); color: var(--roxo-texto); font-size: 13px; font-weight: 600; }
-.cor-cartao { background: var(--roxo); border-radius: 3px; }
-.lanc-forma, .lanc-cartao, .lanc-pago { padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.lanc-forma { background: var(--superficie-3); color: var(--texto-2); }
-.lanc-cartao { background: var(--roxo-claro); color: var(--roxo-texto); }
-.lanc-pago { background: var(--verde-claro); color: var(--verde-texto); }
-.lanc.fatura .lanc-nome { color: var(--roxo-texto); }
-.fatura-situacao { font-size: 14px; font-weight: 700; color: var(--texto-2); align-self: center; }
-.cal-total.neutro { font-size: 11px; font-weight: 700; color: var(--roxo-texto); }
-.cal-item.no-cartao { color: var(--roxo-texto); }
-.cal-item.fatura { border-left-color: var(--roxo); color: var(--roxo-texto); background: var(--roxo-claro); }
-.cal-item.fatura.previsto { background: transparent; outline-color: var(--roxo-borda); }
-.cartao-credito { padding: 8px 0; border-bottom: 1px solid var(--borda); }
-.cartao-credito:last-child { border-bottom: 0; }
-.cartao-credito-nome { font-weight: 700; margin-bottom: 4px; }
-.cartao-credito-linha { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; background: none; font-size: 13px; color: var(--texto-2); text-align: left; }
-button.cartao-credito-linha { cursor: pointer; }
-button.cartao-credito-linha:hover span:first-child { color: var(--azul-escuro); }
-.cartao-credito-linha.vazia { color: var(--texto-3); }
-
-/* ---------- Metas recorrentes (diárias, semanais, mensais) ---------- */
-.cal-marcas { display: inline-flex; align-items: center; gap: 5px; }
-.cal-metas { padding: 0 5px; border-radius: 999px; background: var(--superficie-3); font-size: 10px; font-weight: 800; color: var(--texto-3); }
-.cal-metas.completa { background: var(--verde-claro); color: var(--verde-texto); }
 .secao-contagem.completa { background: var(--verde-claro); color: var(--verde-texto); }
 .habitos-colunas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 20px; align-items: start; }
 .habitos-grupo-titulo { font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
@@ -643,12 +494,99 @@ button.cartao-credito-linha:hover span:first-child { color: var(--azul-escuro); 
 .patente-fontes { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 10px; }
 .patente-fontes .metrica:nth-child(odd) { padding-left: 0; }
 .patente-fontes .metrica:nth-child(even) { border-right: 0; }
+.habito-auto { color: var(--teal); }
+
+/* ---------- Treinos: cadastro ---------- */
+.voltar-link { display: inline-block; margin-bottom: 10px; font-size: 14px; text-decoration: none; }
+.lista-treinos, .lista-exercicios { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.treino-cartao, .exercicio-cartao { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); }
+.treino-cartao.em-curso { border-color: var(--azul); }
+.treino-cartao-corpo, .exercicio-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.treino-cartao-nome { font-size: 17px; font-weight: 800; }
+.treino-cartao-corpo:hover .treino-cartao-nome, .exercicio-corpo:hover .exercicio-nome { color: var(--azul-escuro); }
+.treino-cartao-meta, .exercicio-meta { font-size: 13px; font-weight: 600; color: var(--texto-2); }
+.treino-cartao-acoes { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.exercicio-numero { width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: var(--azul-claro); color: var(--azul-escuro); font-weight: 800; font-size: 14px; }
+.exercicio-nome { font-size: 16px; font-weight: 700; }
+.exercicio-series { font-size: 12px; font-weight: 700; color: var(--teal); }
+.lista-historico { display: flex; flex-direction: column; }
+.historico-linha { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border: 0; border-bottom: 1px solid var(--borda); background: none; text-align: left; cursor: pointer; }
+.historico-linha:last-child { border-bottom: 0; }
+.historico-linha:hover .historico-nome { color: var(--azul-escuro); }
+.historico-data { width: 44px; flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--texto-3); }
+.historico-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.historico-nome { font-weight: 700; }
+.historico-meta { font-size: 12px; font-weight: 600; color: var(--texto-3); }
+.historico-tempo { font-weight: 800; white-space: nowrap; }
+.registro-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: 12px; border-bottom: 1px solid var(--borda); }
+.registro-resumo .metrica:first-child { padding-left: 0; }
+.lista-feitos { display: flex; flex-direction: column; gap: 6px; }
+.feito-linha { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.aviso-falta { padding: 10px 12px; border-radius: 12px; background: var(--amarelo-claro); border: 1px solid var(--amarelo-borda); color: var(--amarelo-texto); font-size: 13px; font-weight: 600; }
+
+/* Editor de séries (formulário do exercício) */
+.serie-cabecalho, .serie-editor { display: grid; grid-template-columns: 22px minmax(0, 1.4fr) 82px 64px minmax(0, .9fr) 30px; gap: 6px; align-items: center; }
+.serie-cabecalho { font-size: 11px; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .03em; }
+.editor-series { display: flex; flex-direction: column; gap: 6px; }
+.serie-editor select, .serie-editor input { width: 100%; padding: 8px; border: 1px solid var(--borda); border-radius: 10px; background: var(--superficie-2); }
+.serie-numero { font-weight: 800; color: var(--texto-3); text-align: center; }
+.serie-pct { display: flex; align-items: center; gap: 4px; font-weight: 700; color: var(--texto-2); }
+.serie-previa { font-size: 13px; font-weight: 800; white-space: nowrap; }
+
+/* ---------- Treino em andamento ---------- */
+.cronometro { font-variant-numeric: tabular-nums; font-weight: 800; }
+.cronometro.grande { font-size: 24px; letter-spacing: .02em; color: var(--azul-escuro); }
+.treino-andamento { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; text-decoration: none; color: inherit; border-color: var(--azul-borda); background: linear-gradient(180deg, var(--azul-claro), var(--superficie) 80%); }
+.treino-andamento-texto { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 2px; }
+.treino-andamento-rotulo { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--azul-escuro); }
+.treino-andamento-nome { font-size: 20px; font-weight: 800; }
+.treino-andamento-meta { font-size: 13px; font-weight: 600; color: var(--texto-2); }
+.grade-iniciar { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.iniciar-treino { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--borda); border-radius: 14px; background: var(--superficie-2); text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.iniciar-treino:hover { border-color: var(--azul); background: var(--azul-claro); }
+.iniciar-treino-nome { font-size: 16px; font-weight: 800; }
+.iniciar-treino-meta { font-size: 12px; font-weight: 600; color: var(--texto-2); }
+
+.execucao-topo { position: sticky; top: 64px; z-index: 5; display: flex; align-items: center; gap: 16px; margin: -8px -8px 16px; padding: 12px 8px; background: var(--fundo); border-bottom: 1px solid var(--borda); }
+.execucao-titulo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.execucao-titulo .pagina-titulo { font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.execucao-progresso { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--texto-2); }
+.execucao-progresso .barra { flex: 1; }
+.lista-execucao { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.execucao-item { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); text-decoration: none; color: inherit; box-shadow: var(--sombra); transition: border-color .15s; }
+.execucao-item:hover { border-color: var(--azul); }
+.execucao-item > .icone { color: var(--texto-3); flex-shrink: 0; }
+.execucao-item-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.execucao-ultimo { font-size: 13px; font-weight: 700; color: var(--amarelo-texto); }
+.execucao-item.feito { background: var(--verde-claro); border-color: var(--verde-borda); box-shadow: none; }
+.execucao-item-check { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--verde); color: #fff; }
+.execucao-item-check .icone { width: 18px; height: 18px; }
+.execucao-fim { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; margin-bottom: 16px; border: 1px dashed var(--verde-borda); border-radius: var(--raio); background: var(--verde-claro); }
+.execucao-corrida { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.btn-grande { padding: 14px 22px; font-size: 16px; border-radius: 14px; }
+
+.exercicio-execucao { display: flex; flex-direction: column; gap: 10px; }
+.exercicio-titulo { font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
+.exercicio-obs { font-size: 14px; color: var(--texto-2); font-style: italic; }
+.ultimo-resultado { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 12px 14px; border-radius: 12px; background: var(--amarelo-claro); border: 1px solid var(--amarelo-borda); }
+.ultimo-resultado span { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--amarelo-texto); }
+.ultimo-resultado strong { font-size: 18px; }
+.ultimo-resultado small { font-size: 12px; color: var(--texto-2); font-weight: 600; }
+.series-execucao { display: flex; flex-direction: column; gap: 6px; }
+.serie-linha { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie-2); }
+.serie-linha .serie-numero { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--superficie-3); color: var(--texto-2); }
+.serie-tipo { flex: 1; display: flex; flex-direction: column; font-weight: 700; }
+.serie-tipo small { font-size: 12px; font-weight: 600; color: var(--texto-3); }
+.serie-carga { font-size: 22px; font-weight: 800; white-space: nowrap; }
+.serie-linha.rot-aquecimento { border-left: 4px solid var(--teal); }
+.serie-linha.rot-falha { border-left: 4px solid var(--vermelho); background: var(--vermelho-claro); border-color: var(--vermelho-borda); border-left-color: var(--vermelho); }
+.registrar-serie { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--borda); }
+.registrar-serie input { font-size: 20px; font-weight: 800; text-align: center; }
+.registrar-serie .btn-grande { width: 100%; }
 
 /* ---------- Telas menores ---------- */
-@media (max-width: 1250px) {
-  .fin-grade { grid-template-columns: 1fr; }
-  .fin-lado { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; align-items: start; }
-  .cartoes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .execucao-topo { top: 60px; }
 }
 @media (max-width: 700px) {
   .conteudo { padding: 16px; }
@@ -656,28 +594,21 @@ button.cartao-credito-linha:hover span:first-child { color: var(--azul-escuro); 
   .aviso-dados { flex-wrap: wrap; }
   .painel { padding: 16px; }
   .pagina-titulo { font-size: 22px; }
-  .cartoes { gap: 10px; }
-  .cartao { flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; }
-  .cartao-icone { width: 36px; height: 36px; }
-  .cartao-valor { font-size: 18px; }
-  .cartoes-fin .cartao-comparacao { grid-column: 1 / -1; }
   .grade-backup { grid-template-columns: 1fr; }
-  .fin-lado { grid-template-columns: 1fr; }
-  .painel-calendario { padding: 8px; }
-  .calendario { gap: 3px; }
-  .cal-dia { min-height: 64px; padding: 4px; border-radius: 8px; }
-  .cal-itens, .cal-lembrete-texto { display: none; }
-  .cal-total { font-size: 10.5px; }
-  .cal-numero { font-size: 12px; }
-  .cal-ponto { width: 6px; height: 6px; }
-  .lanc { gap: 8px; flex-wrap: wrap; }
-  .lanc-corpo { flex-basis: 50%; }
-  .missao-topo { flex-direction: column; }
-  .missao-saldo { align-items: flex-start; }
-  .missao-numeros, .patente-fontes { grid-template-columns: 1fr 1fr; row-gap: 10px; }
+  .patente-fontes, .registro-resumo { grid-template-columns: 1fr 1fr; row-gap: 10px; }
   .metrica { padding: 0 12px 0 0; border-right: 0; }
   .faixa-patente-proxima { display: none; }
   .meta { flex-wrap: wrap; }
-  .tabela th, .tabela td { padding: 8px 4px; font-size: 13px; }
+  .grade-avisos { grid-template-columns: 1fr; }
+  .execucao-topo { gap: 10px; }
+  .execucao-titulo .pagina-titulo { font-size: 18px; }
+  .cronometro.grande { font-size: 19px; }
+  .serie-cabecalho { display: none; }
+  .serie-editor { grid-template-columns: 22px minmax(0, 1fr) 76px 30px; }
+  .serie-editor .serie-previa { grid-column: 2; }
+  .serie-editor input[placeholder="reps"] { grid-column: 3; }
+  .treino-cartao { flex-wrap: wrap; }
+  .treino-cartao-corpo { flex-basis: 100%; }
+  .treino-cartao-acoes { margin-left: auto; }
 }
 

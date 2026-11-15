@@ -9,9 +9,9 @@ var Metas = (function () {
 
   function editar(id, areaPadrao) {
     var m = id ? Dados.meta(id) : null;
-    var titulo = el('input', { type: 'text', value: m ? m.titulo : '', placeholder: 'Ex.: Juntar R$ 10.000 de reserva', maxLength: 120 });
+    var titulo = el('input', { type: 'text', value: m ? m.titulo : '', placeholder: 'Ex.: Fazer supino com 100 kg', maxLength: 120 });
     var descricao = el('textarea', { rows: 3, value: m ? m.descricao : '', placeholder: 'Como você vai saber que concluiu? (opcional)' });
-    var selArea = el('select', null, Dados.AREAS.map(function (a) { return el('option', { value: a[0], text: a[1], selected: (m ? m.area : (areaPadrao || 'financeiro')) === a[0] }); }));
+    var selArea = el('select', null, Dados.AREAS.map(function (a) { return el('option', { value: a[0], text: a[1], selected: (m ? m.area : (areaPadrao || 'habitos')) === a[0] }); }));
     var selDif = el('select', null, Dados.DIFICULDADES.map(function (d) { return el('option', { value: d[0], text: d[1] + ' · ' + d[2] + ' XP', selected: (m ? m.dificuldade : 'media') === d[0] }); }));
     var prazo = el('input', { type: 'date', value: (m && m.prazo) || '' });
     var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
@@ -99,7 +99,7 @@ var Metas = (function () {
 
     if (!abertas.length) raiz.appendChild(el('div', { class: 'vazio' }, [
       el('p', { class: 'vazio-destaque', text: todas.length ? 'Nenhuma meta em aberto aqui' : 'Nenhuma meta ainda' }),
-      el('p', { text: 'Comece por algo concreto e com data: quitar uma dívida, montar a reserva, treinar três vezes por semana durante um mês.' }),
+      el('p', { text: 'Comece por algo concreto e com data: correr 10 km, chegar a um peso, terminar um curso, ler um livro por mês.' }),
       el('div', { class: 'vazio-acoes' }, UI.botao('Criar meta', function () { editar(null, area === 'todas' ? null : area); }, 'btn-primario'))
     ]));
     else raiz.appendChild(el('div', { class: 'lista-metas' }, abertas.map(cartao)));

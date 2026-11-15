@@ -41,7 +41,7 @@ var Backup = (function () {
     raiz.appendChild(el('section', { class: 'painel grade-backup' }, [
       el('div', { class: 'opcao-backup' }, [
         el('h2', { class: 'secao-titulo', text: 'Exportar' }),
-        el('p', { text: 'Baixa um arquivo .json com tudo: ' + db.lancamentos.length + ' lançamentos, ' + db.missoes.length + ' missões, ' + db.lembretes.length + ' lembretes e ' + db.metas.length + ' metas.' }),
+        el('p', { text: 'Baixa um arquivo .json com tudo: ' + db.treinos.length + ' treinos, ' + db.registros.length + ' treinos feitos, ' + db.habitos.length + ' metas recorrentes, ' + db.metas.length + ' metas de longo prazo e ' + db.lembretes.length + ' lembretes.' + (Array.isArray(db.lancamentos) && db.lancamentos.length ? ' Leva também os dados antigos do financeiro.' : '') }),
         UI.botao('Exportar backup', function () { baixar(Dados.exportar()); }, 'btn-primario')
       ]),
       el('div', { class: 'opcao-backup' }, [
@@ -54,7 +54,7 @@ var Backup = (function () {
         el('h2', { class: 'secao-titulo', text: 'Apagar tudo' }),
         el('p', { text: 'Remove todos os dados (no navegador, na nuvem e no arquivo da pasta). As cópias diárias da pasta "backups" são mantidas.' }),
         UI.botao('Apagar todos os dados', function () {
-          UI.confirmar('Apagar TODOS os dados do Life Control? Lançamentos, missões, lembretes, metas e categorias voltam ao estado inicial.', function () { Dados.limpar(); App.atualizar(); UI.aviso('Dados apagados'); }, 'Apagar tudo');
+          UI.confirmar('Apagar TODOS os dados do Life Control? Treinos, histórico, metas e lembretes são apagados.', function () { Dados.limpar(); App.atualizar(); UI.aviso('Dados apagados'); }, 'Apagar tudo');
         }, 'btn-perigo')
       ])
     ]));

@@ -68,7 +68,7 @@ var Lembretes = (function () {
     App.atualizar();
   }
 
-  // Linha de lembrete (usada aqui, no calendário e no painel do Financeiro). compacto: sem anotações.
+  // Linha de lembrete (usada aqui e nos avisos da Página Inicial). compacto: sem anotações.
   function linha(l, compacto) {
     var s = Dados.situacaoLembrete(l), prazo = detalheDoPrazo(l);
     return el('div', { class: 'lembrete relev-' + l.relevancia + (l.concluido ? ' concluido' : '') + (s === 'atrasado' ? ' atrasado' : '') }, [

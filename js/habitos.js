@@ -41,6 +41,7 @@ var Habitos = (function () {
       el('div', { class: 'atalhos' }, [atalho('Todos', [0, 1, 2, 3, 4, 5, 6]), atalho('Seg a sex', [0, 1, 2, 3, 4]), atalho('Sáb e dom', [5, 6])])
     ]));
     var vezes = el('input', { type: 'number', min: 1, max: 31, value: h && h.periodo !== 'dia' ? h.vezes : 4 });
+    var ligadaTreino = el('input', { type: 'checkbox', checked: !!(h && h.treino) });
     var rotuloVezes = el('span', { class: 'campo-rotulo' });
     var campoVezes = el('label', { class: 'campo' }, [rotuloVezes, vezes]);
     function ajustar() {
@@ -54,7 +55,7 @@ var Habitos = (function () {
     var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
       if (!titulo.value.trim()) { titulo.focus(); return false; }
       if (periodo.value === 'dia' && !marcados.length) { UI.aviso('Escolha pelo menos um dia da semana.'); return false; }
-      Dados.salvarHabito({ titulo: titulo.value, periodo: periodo.value, dias: marcados, vezes: Number(vezes.value) }, id);
+      Dados.salvarHabito({ titulo: titulo.value, periodo: periodo.value, dias: marcados, vezes: Number(vezes.value), treino: ligadaTreino.checked }, id);
       App.atualizar();
     } }];
     if (h) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
@@ -63,7 +64,8 @@ var Habitos = (function () {
     UI.modal(h ? 'Editar meta recorrente' : 'Nova meta recorrente', [
       UI.campo('Meta', titulo, 'Para horários diferentes na semana e no fim de semana, crie duas metas (ex.: "Estudar 4 horas" de seg a sex e "Estudar 5 horas" sáb e dom).'),
       UI.campo('Frequência', periodo),
-      campoDias, campoVezes
+      campoDias, campoVezes,
+      el('label', { class: 'campo-check' }, [ligadaTreino, el('span', { text: 'Marcar sozinha quando eu finalizar um treino' })])
     ], botoes, { icone: 'alvo', subtitulo: 'Cumprir rende XP: ' + Dados.XP_HABITO.dia + ' por dia, ' + Dados.XP_HABITO.semana + ' por semana batida, ' + Dados.XP_HABITO.mes + ' por mês batido.' });
   }
 
@@ -88,7 +90,8 @@ var Habitos = (function () {
         el('span', { class: 'habito-titulo', text: h.titulo }),
         el('span', { class: 'habito-meta' }, [
           el('span', { text: descricao(h) }),
-          diaria && seq > 1 ? el('span', { class: 'habito-sequencia', text: seq + ' dias seguidos' }) : null
+          diaria && seq > 1 ? el('span', { class: 'habito-sequencia', text: seq + ' dias seguidos' }) : null,
+          h.treino ? el('span', { class: 'habito-auto', text: 'marca ao treinar' }) : null
         ]),
         diaria ? null : UI.barra(p.feitas / p.alvo * 100)
       ]),

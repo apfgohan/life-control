@@ -60,13 +60,13 @@ var Nuvem = (function () {
   // ---------- Sincronização ----------
   function local() { return Dados.db.atualizadoEm || 0; }
   function vazioNoTexto(texto) {
-    try { var d = JSON.parse(texto); return !d || !Array.isArray(d.lancamentos) || Dados.semDados(d); } catch (e) { return false; }
+    try { var d = JSON.parse(texto); return !Dados.ehDoPrograma(d) || Dados.semDados(d); } catch (e) { return false; }
   }
 
   function aplicarRemoto(texto) {
     var dados;
     try { dados = JSON.parse(texto); } catch (e) { falhar(new Error('Os dados da nuvem estão ilegíveis e não foram aplicados.')); return; }
-    if (!dados || !Array.isArray(dados.lancamentos)) { falhar(new Error('Os dados da nuvem não parecem ser deste programa.')); return; }
+    if (!Dados.ehDoPrograma(dados)) { falhar(new Error('Os dados da nuvem não parecem ser deste programa.')); return; }
     // Não troca os dados com um formulário aberto (perderia o que está sendo digitado).
     if (document.querySelector('.modal-fundo')) { remotoEsperando = texto; return; }
     remotoEsperando = null;

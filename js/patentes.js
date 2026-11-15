@@ -27,7 +27,7 @@ var Patentes = (function () {
   function xpDoLembrete(l) { return XP_LEMBRETE[l.relevancia] || 10; }
 
   function calcular() {
-    var db = Dados.db, r = { xp: 0, fontes: { metas: 0, lembretes: 0, habitos: 0 }, qtd: { metas: 0, lembretes: 0, habitos: 0 }, xpHoje: 0 }, hoje = UI.hoje();
+    var db = Dados.db, r = { xp: 0, fontes: { metas: 0, lembretes: 0, habitos: 0, treinos: 0 }, qtd: { metas: 0, lembretes: 0, habitos: 0, treinos: 0 }, xpHoje: 0 }, hoje = UI.hoje();
     db.metas.forEach(function (m) {
       if (!m.concluida) return;
       var x = Dados.xpDaMeta(m);
@@ -42,7 +42,9 @@ var Patentes = (function () {
     });
     var h = Dados.xpDosHabitos(hoje);
     r.fontes.habitos = h.xp; r.qtd.habitos = h.cumpridas; r.xpHoje += h.hoje;
-    r.xp = r.fontes.metas + r.fontes.lembretes + r.fontes.habitos;
+    var t = Dados.xpDosTreinos(hoje);
+    r.fontes.treinos = t.xp; r.qtd.treinos = t.feitos; r.xpHoje += t.hoje;
+    r.xp = r.fontes.metas + r.fontes.lembretes + r.fontes.habitos + r.fontes.treinos;
     var i = 0;
     while (i + 1 < LISTA.length && r.xp >= LISTA[i + 1].xp) i++;
     r.indice = i;
@@ -88,11 +90,12 @@ var Patentes = (function () {
       ]),
       el('div', { class: 'patente-fontes' }, [
         UI.metrica('Metas concluídas', r.qtd.metas + ' · ' + UI.fmtNum(r.fontes.metas) + ' XP'),
+        UI.metrica('Treinos feitos', r.qtd.treinos + ' · ' + UI.fmtNum(r.fontes.treinos) + ' XP'),
         UI.metrica('Metas recorrentes', r.qtd.habitos + ' · ' + UI.fmtNum(r.fontes.habitos) + ' XP'),
         UI.metrica('Lembretes concluídos', r.qtd.lembretes + ' · ' + UI.fmtNum(r.fontes.lembretes) + ' XP'),
         UI.metrica('Hoje', '+' + UI.fmtNum(r.xpHoje) + ' XP', r.xpHoje ? 'completo' : '')
       ]),
-      el('div', { class: 'campo-ajuda', text: 'Metas rendem ' + Dados.DIFICULDADES.map(function (d) { return d[2] + ' (' + d[1].toLowerCase() + ')'; }).join(', ') + ' XP. Cada meta diária cumprida rende ' + Dados.XP_HABITO.dia + ' XP; bater a meta da semana, ' + Dados.XP_HABITO.semana + '; a do mês, ' + Dados.XP_HABITO.mes + '. Lembretes concluídos rendem 5, 10 ou 20 XP conforme a relevância.' }),
+      el('div', { class: 'campo-ajuda', text: 'Metas rendem ' + Dados.DIFICULDADES.map(function (d) { return d[2] + ' (' + d[1].toLowerCase() + ')'; }).join(', ') + ' XP. Cada treino finalizado rende ' + Dados.XP_TREINO.base + ' XP + ' + Dados.XP_TREINO.exercicio + ' por exercício feito. Cada meta diária cumprida rende ' + Dados.XP_HABITO.dia + ' XP; bater a meta da semana, ' + Dados.XP_HABITO.semana + '; a do mês, ' + Dados.XP_HABITO.mes + '. Lembretes concluídos rendem 5, 10 ou 20 XP conforme a relevância.' }),
       el('div', { class: 'escada' }, LISTA.map(function (p) {
         return el('div', { class: 'degrau' + (p.indice === r.indice ? ' atual' : p.indice < r.indice ? ' passado' : '') }, [
           insignia(p.indice, 'media'),

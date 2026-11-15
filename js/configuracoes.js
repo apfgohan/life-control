@@ -1,8 +1,7 @@
-// Página "Configurações": perfil, categorias e itens (com as contas fixas de todo mês).
+// Página "Configurações": perfil (nome e foto).
 var Configuracoes = (function () {
   var el = UI.el;
 
-  // ---------- Perfil ----------
   // A foto é reduzida para 256px e guardada junto com os dados (assim aparece em qualquer aparelho).
   function reduzirFoto(arquivo, pronto) {
     var leitor = new FileReader();
@@ -43,158 +42,12 @@ var Configuracoes = (function () {
     ]);
   }
 
-  // ---------- Categorias e itens ----------
-  function editarCategoria(id, tipo) {
-    var c = id ? Dados.categoria(id) : null;
-    tipo = c ? c.tipo : tipo;
-    var nome = el('input', { type: 'text', value: c ? c.nome : '', placeholder: tipo === 'gasto' ? 'Ex.: Educação' : 'Ex.: Rendimentos', maxLength: 50 });
-    var cor = el('input', { type: 'color', value: c ? c.cor : '#3b8cf0' });
-    var saude = el('input', { type: 'checkbox', checked: !!(c && c.papel === 'saude') });
-    var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
-      if (!nome.value.trim()) { nome.focus(); return false; }
-      Dados.salvarCategoria({ nome: nome.value, cor: cor.value, tipo: tipo, papel: saude.checked ? 'saude' : null }, id);
-      App.atualizar();
-    } }];
-    if (c) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
-      UI.confirmar('Excluir a categoria "' + c.nome + '" e os itens dela?', function () {
-        if (!Dados.excluirCategoria(c.id)) UI.aviso('Há lançamentos nesta categoria: ela não pode ser excluída.');
-        App.atualizar();
-      });
-    } });
-    UI.modal(c ? 'Editar categoria' : 'Nova categoria de ' + (tipo === 'gasto' ? 'gasto' : 'entrada'), [
-      el('div', { class: 'campos-linha' }, [UI.campo('Nome', nome), UI.campo('Cor', cor)]),
-      tipo === 'gasto' ? el('label', { class: 'campo-check' }, [saude, el('span', { text: 'Gastos de saúde (comparar com o Auxílio Saúde)' })]) : null
-    ], botoes);
-  }
-
-  function editarItem(id, categoriaId) {
-    var i = id ? Dados.item(id) : null;
-    var c = Dados.categoria(i ? i.categoriaId : categoriaId), entrada = c.tipo === 'entrada';
-    var nome = el('input', { type: 'text', value: i ? i.nome : '', placeholder: entrada ? 'Ex.: Aluguel recebido' : 'Ex.: Condomínio', maxLength: 60 });
-    var fixo = el('input', { type: 'checkbox', checked: !!(i && i.fixo) });
-    var valor = el('input', { type: 'text', inputMode: 'decimal', placeholder: '0,00', value: i && i.fixo ? UI.campoValor(i.fixo.valor) : '' });
-    var dia = el('input', { type: 'number', min: 1, max: 31, value: i && i.fixo ? i.fixo.dia : 5 });
-    var papel = el('select', null, [['', 'Entrada comum'], ['diaria', 'Diária de missão'], ['auxilio-saude', 'Auxílio Saúde (reembolso)']].map(function (o) {
-      return el('option', { value: o[0], text: o[1], selected: ((i && i.papel) || '') === o[0] });
-    }));
-    var linhaFixo = el('div', { class: 'campos-linha' }, [
-      UI.campo('Valor de todo mês (R$)', valor, 'Deixe em branco se o valor muda a cada mês (energia, água…).'),
-      UI.campo(entrada ? 'Dia do recebimento' : 'Dia do vencimento', dia)
-    ]);
-    function ajustar() { linhaFixo.hidden = !fixo.checked; }
-    fixo.addEventListener('change', ajustar);
-    ajustar();
-
-    var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
-      if (!nome.value.trim()) { nome.focus(); return false; }
-      var v = UI.lerValor(valor.value);
-      if (fixo.checked && valor.value.trim() && !(v > 0)) { UI.aviso('Valor inválido. Deixe em branco se ele varia.'); valor.focus(); return false; }
-      Dados.salvarItem({ nome: nome.value, categoriaId: c.id, papel: entrada ? papel.value : null, fixo: fixo.checked ? { valor: v > 0 ? v : 0, dia: Number(dia.value) || 1 } : null }, id);
-      App.atualizar();
-    } }];
-    if (i) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
-      UI.confirmar('Excluir o item "' + i.nome + '"? Se já houver lançamentos, ele só sai das listas e o histórico continua.', function () {
-        UI.aviso(Dados.excluirItem(i.id) === 'arquivado' ? 'Item arquivado (o histórico foi mantido)' : 'Item excluído');
-        App.atualizar();
-      });
-    } });
-    UI.modal(i ? 'Editar item' : 'Novo item em ' + c.nome, [
-      UI.campo('Nome', nome),
-      entrada ? UI.campo('Tipo', papel, 'Diárias e Auxílio Saúde entram nas comparações da página Missões e Saúde.') : null,
-      el('label', { class: 'campo-check' }, [fixo, el('span', { text: entrada ? 'Entrada recorrente: repete todo mês' : 'Conta recorrente: repete todo mês' })]),
-      linhaFixo,
-      el('span', { class: 'campo-ajuda', text: 'Itens recorrentes aparecem como previstos no calendário, no dia marcado, até você confirmar o pagamento ou recebimento.' })
-    ], botoes);
-  }
-
-  function blocoCategoria(c) {
-    var itens = Dados.itensDa(c.id);
-    return el('div', { class: 'cfg-categoria', style: { borderLeftColor: c.cor } }, [
-      el('div', { class: 'cfg-categoria-topo' }, [
-        el('span', { class: 'cfg-categoria-nome', text: c.nome }),
-        c.papel === 'saude' ? UI.selo('Saúde', 'info') : null,
-        el('span', { class: 'cfg-espaco' }),
-        el('button', { type: 'button', class: 'btn-icone', title: 'Editar categoria', onclick: function () { editarCategoria(c.id); } }, UI.icone('lapis'))
-      ]),
-      el('div', { class: 'cfg-itens' }, itens.map(function (i) {
-        return el('button', { type: 'button', class: 'cfg-item', title: 'Editar item', onclick: function () { editarItem(i.id); } }, [
-          el('span', { text: i.nome }),
-          i.papel === 'diaria' ? UI.selo('Diária', 'info') : i.papel === 'auxilio-saude' ? UI.selo('Auxílio Saúde', 'info') : null,
-          i.fixo ? el('span', { class: 'cfg-fixo', text: (i.fixo.valor ? UI.fmtMoeda(i.fixo.valor) : 'valor variável') + ' · todo dia ' + i.fixo.dia }) : null
-        ]);
-      }).concat([el('button', { type: 'button', class: 'cfg-item cfg-novo', onclick: function () { editarItem(null, c.id); } }, [UI.icone('mais'), 'Novo item'])]))
-    ]);
-  }
-
-  function painelCategorias(tipo, titulo, ajuda) {
-    return el('section', { class: 'painel' }, [
-      el('div', { class: 'painel-lado-topo' }, [
-        el('h2', { class: 'secao-titulo', text: titulo }),
-        UI.botao('Nova categoria', function () { editarCategoria(null, tipo); }, 'btn-secundario btn-mini', 'mais')
-      ]),
-      el('p', { class: 'modal-desc cfg-ajuda', text: ajuda }),
-      el('div', { class: 'cfg-lista' }, Dados.categorias(tipo).map(blocoCategoria))
-    ]);
-  }
-
-  // ---------- Formas de pagamento ----------
-  function editarForma(id) {
-    var f = id ? Dados.forma(id) : null;
-    var nome = el('input', { type: 'text', value: f ? f.nome : '', placeholder: 'Ex.: Cartão de Crédito Nubank', maxLength: 60 });
-    var tipo = el('select', null, [['avista', 'À vista (PIX, débito, dinheiro…)'], ['cartao', 'Cartão de crédito']].map(function (o) {
-      return el('option', { value: o[0], text: o[1], selected: (f ? f.tipo : 'cartao') === o[0] });
-    }));
-    var fechamento = el('input', { type: 'number', min: 1, max: 31, value: f && f.fechamento ? f.fechamento : 3 });
-    var vencimento = el('input', { type: 'number', min: 1, max: 31, value: f && f.vencimento ? f.vencimento : 10 });
-    var linha = el('div', { class: 'campos-linha' }, [
-      UI.campo('Dia do fechamento', fechamento, 'Compras depois deste dia vão para a fatura seguinte.'),
-      UI.campo('Dia do vencimento', vencimento, 'Dia em que a fatura é paga.')
-    ]);
-    function ajustar() { linha.hidden = tipo.value !== 'cartao'; }
-    tipo.addEventListener('change', ajustar);
-    ajustar();
-    var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
-      if (!nome.value.trim()) { nome.focus(); return false; }
-      Dados.salvarForma({ nome: nome.value, tipo: tipo.value, fechamento: fechamento.value, vencimento: vencimento.value }, id);
-      App.atualizar();
-    } }];
-    if (f) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
-      UI.confirmar('Excluir "' + f.nome + '"? Se já houver lançamentos, ela só sai das listas e o histórico continua.', function () {
-        UI.aviso(Dados.excluirForma(f.id) === 'arquivado' ? 'Forma arquivada (o histórico foi mantido)' : 'Forma de pagamento excluída');
-        App.atualizar();
-      });
-    } });
-    UI.modal(f ? 'Editar forma de pagamento' : 'Nova forma de pagamento', [
-      UI.campo('Nome', nome), UI.campo('Tipo', tipo), linha,
-      el('span', { class: 'campo-ajuda', text: 'Mudar os dias do cartão vale para as próximas compras; as já lançadas mantêm a fatura em que estão.' })
-    ], botoes);
-  }
-
-  function painelFormas() {
-    return el('section', { class: 'painel' }, [
-      el('div', { class: 'painel-lado-topo' }, [
-        el('h2', { class: 'secao-titulo', text: 'Formas de pagamento' }),
-        UI.botao('Nova forma', function () { editarForma(); }, 'btn-secundario btn-mini', 'mais')
-      ]),
-      el('p', { class: 'modal-desc cfg-ajuda', text: 'Confira o dia do fechamento e do vencimento de cada cartão: é por eles que o programa sabe em qual fatura cada compra cai.' }),
-      el('div', { class: 'cfg-itens' }, Dados.formas().map(function (f) {
-        return el('button', { type: 'button', class: 'cfg-item', title: 'Editar', onclick: function () { editarForma(f.id); } }, [
-          el('span', { text: f.nome }),
-          f.tipo === 'cartao' ? el('span', { class: 'cfg-fixo', text: 'fecha dia ' + f.fechamento + ' · vence dia ' + f.vencimento }) : null
-        ]);
-      }))
-    ]);
-  }
-
   function render(raiz) {
     raiz.appendChild(el('div', { class: 'pagina-topo' }, el('div', null, [
       el('h1', { class: 'pagina-titulo', text: 'Configurações' }),
-      el('div', { class: 'pagina-subtitulo', text: 'Perfil, categorias e contas fixas.' })
+      el('div', { class: 'pagina-subtitulo', text: 'Seu perfil.' })
     ])));
     raiz.appendChild(painelPerfil());
-    raiz.appendChild(painelFormas());
-    raiz.appendChild(painelCategorias('entrada', 'Entradas (fontes de renda)', 'Marque o salário como entrada fixa para ele aparecer todo mês no calendário.'));
-    raiz.appendChild(painelCategorias('gasto', 'Gastos', 'Clique num item para renomear ou marcar como conta fixa (aluguel, internet…), com valor e dia do vencimento.'));
   }
 
   return { render: render };

@@ -1,7 +1,7 @@
 {
   "name": "Life Control",
   "short_name": "Life Control",
-  "description": "Controle financeiro, lembretes e metas de vida.",
+  "description": "Treinos, metas, hábitos e lembretes.",
   "lang": "pt-BR",
   "start_url": "./#/inicio",
   "scope": "./",

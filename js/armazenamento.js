@@ -104,7 +104,7 @@ var Armazenamento = (function () {
         try { doArquivo = JSON.parse(texto); } catch (e) {
           throw new Error('O arquivo ' + ARQUIVO + ' está ilegível. Ele não foi alterado; restaure uma cópia da pasta "backups".');
         }
-        if (!doArquivo || !Array.isArray(doArquivo.lancamentos)) throw new Error('O arquivo ' + ARQUIVO + ' não parece ser deste programa.');
+        if (!doArquivo || !Dados.ehDoPrograma(doArquivo)) throw new Error('O arquivo ' + ARQUIVO + ' não parece ser deste programa.');
         if (Dados.semDados() || (doArquivo.atualizadoEm || 0) >= (Dados.db.atualizadoEm || 0)) {
           Dados.substituir(doArquivo, 'arquivo');
           estado = 'conectado';

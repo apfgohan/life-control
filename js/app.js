@@ -1,15 +1,15 @@
-// Navegação entre as páginas (rotas no endereço: #/financeiro, #/lembretes, ...).
+// Navegação entre as páginas (rotas no endereço: #/inicio, #/treinos, #/treino, ...).
 var App = (function () {
   var rotas = {
-    inicio: Financeiro.render,
-    comparativos: Comparativos.render,
+    inicio: Inicio.render,
+    treinos: Treinos.render,
+    treino: Treinos.renderExecucao,
     lembretes: Lembretes.render,
     metas: Metas.render,
-    fisico: Fisico.render,
     backup: Backup.render,
     configuracoes: Configuracoes.render
   };
-  var ROTA_INICIAL = 'inicio'; // endereços antigos (#/financeiro) também caem aqui
+  var ROTA_INICIAL = 'inicio'; // endereços antigos (#/financeiro, #/fisico…) também caem aqui
   var ultimaRota = null;
 
   function render() {
@@ -19,8 +19,9 @@ var App = (function () {
     var rolagem = chave === ultimaRota ? window.scrollY : 0;
     ultimaRota = chave;
 
+    var menu = nome === 'treino' ? 'inicio' : nome; // o treino em andamento é aberto pela Página Inicial
     document.querySelectorAll('#menu a').forEach(function (a) {
-      a.classList.toggle('ativo', a.getAttribute('data-rota') === nome);
+      a.classList.toggle('ativo', a.getAttribute('data-rota') === menu);
     });
     desenharLateral();
     var raiz = document.getElementById('conteudo');

@@ -1,76 +1,56 @@
 // Camada de dados: tudo que o programa guarda passa por aqui.
 // Os dados ficam no localStorage (cópia rápida), no arquivo da pasta de dados e na nuvem.
+//
+// O programa era também de controle financeiro. Esses campos (categorias, itens, lancamentos, formas, faturasPagas,
+// missoes) não são mais usados, mas continuam guardados como estavam: nada é apagado dos dados antigos.
 var Dados = (function () {
   var CHAVE = 'life-control';
-  var VERSAO = 1;
+  var VERSAO = 2;
 
   function vazio() {
-    var d = {
+    return {
       versao: VERSAO,
+      app: 'life-control',
       perfil: { nome: '', foto: null },   // foto: imagem enviada, em data URL
-      // papel 'saude': os gastos da categoria são comparados com o Auxílio Saúde.
-      categorias: [],   // { id, nome, tipo: 'gasto'|'entrada', cor, ordem, papel }
-      // papel 'diaria' / 'auxilio-saude' (só entradas). fixo: conta que se repete todo mês a partir de `desde`.
-      itens: [],        // { id, categoriaId, nome, ordem, papel, arquivado, fixo: null | { valor, dia, desde: 'AAAA-MM' } }
-      // valor sempre positivo (o tipo vem da categoria do item). mesFixo: mês da conta fixa que este lançamento quita;
-      // pulado: a conta fixa não vale naquele mês.
-      // Compra no cartão: formaId de um cartão + parcelas + primeiraFatura (vencimento da 1ª parcela). A compra aparece
-      // no dia em que foi feita, mas o gasto entra nas faturas (uma parcela por mês a partir de primeiraFatura).
-      lancamentos: [],  // { id, data, itemId, valor, descricao, status: 'realizado'|'previsto', missaoId, mesFixo, pulado, formaId, parcelas, primeiraFatura, criadoEm }
-      // Formas de pagamento. Cartão: dia do fechamento e dia do vencimento da fatura.
-      formas: [],       // { id, nome, tipo: 'avista'|'cartao', fechamento, vencimento, ordem, arquivado }
-      faturasPagas: {}, // 'formaId|AAAA-MM-DD' (vencimento) -> data em que a fatura foi paga
+      // Treinos cadastrados. Musculação: exercícios com séries em % da carga principal (a série de 100%).
+      treinos: [],      // { id, nome, tipo: 'musculacao'|'corrida', ordem, arquivado, criadoEm,
+                        //   exercicios: [{ id, nome, carga, descanso (min), obs, series: [{ rotulo, pct, reps }] }] }
+      // Treinos feitos. fim null = treino em andamento (continua em qualquer aparelho).
+      registros: [],    // { id, treinoId, nomeTreino, tipo, data, inicio, fim, exercicios: [{ exercicioId, nome, carga, reps, concluidoEm }],
+                        //   corrida: { km }, obs }
       // Metas recorrentes. periodo 'dia': vale nos dias da semana de `dias` (0 = segunda … 6 = domingo);
       // 'semana' / 'mes': fazer `vezes` vezes no período. feitos: os dias em que foi cumprida.
-      habitos: [],      // { id, titulo, periodo, dias, vezes, desde, feitos: { 'AAAA-MM-DD': 1 }, criadoEm }
-      missoes: [],      // { id, nome, destino, inicio, fim, criadoEm }
+      // treino: true = é marcada sozinha quando um treino é finalizado.
+      habitos: [],      // { id, titulo, periodo, dias, vezes, desde, treino, feitos: { 'AAAA-MM-DD': 1 }, criadoEm }
       // tipo 'dia': data (+hora); 'prazo': de inicio até fim; 'aberto': até concluir.
       lembretes: [],    // { id, titulo, detalhe, tipo, data, hora, inicio, fim, relevancia, concluido, dataConclusao, criadoEm }
       metas: [],        // { id, area, titulo, descricao, dificuldade, prazo, concluida, dataConclusao, criadoEm }
-      configurado: false // vira true quando categorias ou perfil são alterados (dados "não vazios" para a sincronização)
+      configurado: false // vira true quando o perfil é alterado (dados "não vazios" para a sincronização)
     };
-    semente(d);
-    return d;
   }
 
-  // Categorias e itens iniciais. Os ids são fixos para todos os aparelhos começarem iguais.
-  function semente(d) {
-    var cats = [
-      ['entradas', 'Entradas', 'entrada', '#3ecf7c', null, [['salario', 'Salário'], ['diarias', 'Diárias', 'diaria'], ['auxilio-saude', 'Auxílio Saúde', 'auxilio-saude'], ['outras-entradas', 'Outras entradas']]],
-      ['casa', 'Casa', 'gasto', '#3b8cf0', null, [['aluguel', 'Aluguel'], ['energia', 'Conta de Energia'], ['agua', 'Conta de Água'], ['gas', 'Conta de Gás'], ['internet', 'Internet']]],
-      ['transporte', 'Transporte', 'gasto', '#f2b33d', null, [['uber', 'Uber'], ['gasolina', 'Gasolina'], ['passagens', 'Passagens']]],
-      ['alimentacao', 'Alimentação', 'gasto', '#f3a24b', null, [['mercado', 'Mercado'], ['restaurante', 'Restaurante e delivery']]],
-      ['saude', 'Saúde', 'gasto', '#f2607a', 'saude', [['consultas', 'Consultas e exames'], ['farmacia', 'Farmácia'], ['plano', 'Plano de saúde']]],
-      ['hospedagem', 'Hospedagem', 'gasto', '#45cdbd', null, [['hotel', 'Hotel']]],
-      ['lazer', 'Lazer', 'gasto', '#c7a8ff', null, [['lazer', 'Lazer']]],
-      ['outros', 'Outros', 'gasto', '#a9b0c4', null, [['outros', 'Outros gastos']]]
-    ];
-    // Os dias de fechamento e vencimento dos cartões são só um ponto de partida: ajuste em Configurações.
-    [['pix', 'PIX', 'avista'], ['debito', 'Cartão de Débito', 'avista'], ['dinheiro', 'Dinheiro', 'avista'],
-      ['credito-btg', 'Cartão de Crédito BTG', 'cartao'], ['credito-santander', 'Cartão de Crédito Santander', 'cartao']].forEach(function (f, i) {
-      d.formas.push({ id: 'forma-' + f[0], nome: f[1], tipo: f[2], fechamento: f[2] === 'cartao' ? 3 : null, vencimento: f[2] === 'cartao' ? 10 : null, ordem: i + 1, arquivado: false });
-    });
-    cats.forEach(function (c, i) {
-      d.categorias.push({ id: 'cat-' + c[0], nome: c[1], tipo: c[2], cor: c[3], ordem: i + 1, papel: c[4] });
-      c[5].forEach(function (it, j) {
-        d.itens.push({ id: 'item-' + it[0], categoriaId: 'cat-' + c[0], nome: it[1], ordem: j + 1, papel: it[2] || null, arquivado: false, fixo: null });
-      });
-    });
-  }
+  // Áreas antigas das metas (do tempo do financeiro) passam para as novas.
+  var AREA_ANTIGA = { financeiro: 'habitos', fisico: 'treino', geral: 'habitos' };
 
   // Completa o que faltar (dados antigos, importados ou vindos da nuvem).
   function normalizar(d) {
     var v = vazio();
     if (!d || typeof d !== 'object') return v;
-    ['categorias', 'itens', 'formas', 'lancamentos', 'missoes', 'lembretes', 'metas', 'habitos'].forEach(function (k) {
-      if (!Array.isArray(d[k])) d[k] = k === 'categorias' || k === 'itens' || k === 'formas' ? v[k] : [];
-    });
-    if (!d.faturasPagas || typeof d.faturasPagas !== 'object') d.faturasPagas = {};
+    ['treinos', 'registros', 'lembretes', 'metas', 'habitos'].forEach(function (k) { if (!Array.isArray(d[k])) d[k] = []; });
     d.habitos.forEach(function (h) { if (!h.feitos || typeof h.feitos !== 'object') h.feitos = {}; if (!Array.isArray(h.dias)) h.dias = []; });
+    d.treinos.forEach(function (t) {
+      if (!Array.isArray(t.exercicios)) t.exercicios = [];
+      t.exercicios.forEach(function (e) { if (!Array.isArray(e.series)) e.series = []; });
+    });
+    d.registros.forEach(function (r) { if (!Array.isArray(r.exercicios)) r.exercicios = []; });
+    d.metas.forEach(function (m) { if (AREA_ANTIGA[m.area]) m.area = AREA_ANTIGA[m.area]; });
     if (!d.perfil || typeof d.perfil !== 'object') d.perfil = v.perfil;
+    d.app = 'life-control';
     d.versao = VERSAO;
     return d;
   }
+  // Para a pasta de dados, a nuvem e a importação: reconhece os dados deste programa (inclusive os antigos).
+  function ehDoPrograma(d) { return !!(d && typeof d === 'object' && (d.app === 'life-control' || Array.isArray(d.lancamentos) || Array.isArray(d.treinos))); }
 
   function carregar() {
     try {
@@ -104,16 +84,17 @@ var Dados = (function () {
   function exportar() { return JSON.stringify(db, null, 2); }
   function importar(texto) {
     var d = JSON.parse(texto);
-    if (!d || !Array.isArray(d.lancamentos)) throw new Error('Arquivo não parece ser um backup deste programa.');
+    if (!ehDoPrograma(d)) throw new Error('Arquivo não parece ser um backup deste programa.');
     db = normalizar(d);
     salvar();
   }
   function limpar() { db = vazio(); salvar(); }
-  // Sem nada lançado (para a sincronização: dados vazios nunca vencem dados preenchidos).
+  // Sem nada guardado (para a sincronização: dados vazios nunca vencem dados preenchidos).
+  // Conta também os lançamentos antigos do financeiro, para dados antigos nunca serem tratados como vazios.
   function semDados(d) {
     d = d || db;
     if (!d) return true;
-    return !d.configurado && !['lancamentos', 'missoes', 'lembretes', 'metas', 'habitos'].some(function (k) { return Array.isArray(d[k]) && d[k].length; });
+    return !d.configurado && !['treinos', 'registros', 'lembretes', 'metas', 'habitos', 'lancamentos'].some(function (k) { return Array.isArray(d[k]) && d[k].length; });
   }
 
   function novoId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -124,6 +105,12 @@ var Dados = (function () {
     return null;
   }
   function texto(v) { return String(v == null ? '' : v).trim(); }
+  function numero(v, min, max, padrao) {
+    var n = typeof v === 'number' ? v : (window.UI ? UI.lerValor(v) : parseFloat(v));
+    if (!isFinite(n)) return padrao;
+    return Math.max(min, Math.min(max, n));
+  }
+  function diasNoMes(mes) { var p = mes.split('-'); return new Date(Number(p[0]), Number(p[1]), 0).getDate(); }
 
   // ---------- Perfil ----------
   function atualizarPerfil(campos) {
@@ -133,267 +120,135 @@ var Dados = (function () {
     salvar();
   }
 
-  // ---------- Categorias e itens ----------
-  function categoria(id) { return buscar(db.categorias, id); }
-  function item(id) { return buscar(db.itens, id); }
-  function categorias(tipo) { return db.categorias.filter(function (c) { return !tipo || c.tipo === tipo; }).sort(porOrdem); }
-  function itensDa(categoriaId, comArquivados) {
-    return db.itens.filter(function (i) { return i.categoriaId === categoriaId && (comArquivados || !i.arquivado); }).sort(porOrdem);
-  }
-  function categoriaDoItem(itemId) { var i = item(itemId); return i ? categoria(i.categoriaId) : null; }
-  function tipoDoItem(itemId) { var c = categoriaDoItem(itemId); return c ? c.tipo : 'gasto'; }
-  function nomeDoItem(itemId) { var i = item(itemId); return i ? i.nome : '(item removido)'; }
-  function corDoItem(itemId) { var c = categoriaDoItem(itemId); return c ? c.cor : '#727b93'; }
+  // ---------- Treinos (cadastro) ----------
+  var TIPOS_TREINO = [['musculacao', 'Musculação'], ['corrida', 'Corrida']];
+  var ROTULOS_SERIE = [['aquecimento', 'Aquecimento'], ['normal', 'Série'], ['falha', 'Até a falha']];
+  // Três séries padrão: aquecimento a 50%, 75% e a principal (100%) até a falha.
+  var SERIES_PADRAO = [{ rotulo: 'aquecimento', pct: 50, reps: '' }, { rotulo: 'normal', pct: 75, reps: '' }, { rotulo: 'falha', pct: 100, reps: '' }];
 
-  function salvarCategoria(campos, id) {
-    var c = id ? categoria(id) : null;
-    if (!c) { c = { id: novoId(), tipo: campos.tipo === 'entrada' ? 'entrada' : 'gasto', ordem: proximaOrdem(db.categorias), papel: null }; db.categorias.push(c); }
-    c.nome = texto(campos.nome) || 'Categoria';
-    c.cor = campos.cor || c.cor || '#3b8cf0';
-    if (campos.papel !== undefined) c.papel = c.tipo === 'gasto' && campos.papel === 'saude' ? 'saude' : null;
-    db.configurado = true;
+  function treino(id) { return buscar(db.treinos, id); }
+  function treinos(comArquivados) { return db.treinos.filter(function (t) { return comArquivados || !t.arquivado; }).sort(porOrdem); }
+  function salvarTreino(campos, id) {
+    var t = id ? treino(id) : null;
+    if (!t) { t = { id: novoId(), ordem: proximaOrdem(db.treinos), arquivado: false, exercicios: [], criadoEm: Date.now() }; db.treinos.push(t); }
+    t.nome = texto(campos.nome) || 'Treino';
+    if (campos.tipo) t.tipo = campos.tipo === 'corrida' ? 'corrida' : 'musculacao';
+    if (!t.tipo) t.tipo = 'musculacao';
     salvar();
-    return c;
+    return t;
   }
-  // Categoria com lançamentos não pode ser excluída (perderia o histórico).
-  function excluirCategoria(id) {
-    var ids = db.itens.filter(function (i) { return i.categoriaId === id; }).map(function (i) { return i.id; });
-    if (db.lancamentos.some(function (l) { return ids.indexOf(l.itemId) >= 0; })) return false;
-    db.itens = db.itens.filter(function (i) { return i.categoriaId !== id; });
-    db.categorias = db.categorias.filter(function (c) { return c.id !== id; });
-    db.configurado = true;
+  // Treino que já foi feito é arquivado (some das listas, o histórico continua); nunca feito, é excluído.
+  function excluirTreino(id) {
+    var feito = db.registros.some(function (r) { return r.treinoId === id; });
+    if (feito) treino(id).arquivado = true; else db.treinos = db.treinos.filter(function (t) { return t.id !== id; });
     salvar();
-    return true;
+    return feito ? 'arquivado' : 'excluido';
   }
-  // campos.fixo: null ou { valor (0 se variável), dia }. O mês de início de uma conta fixa nova é o mês atual.
-  function salvarItem(campos, id) {
-    var i = id ? item(id) : null;
-    if (!i) {
-      i = { id: novoId(), categoriaId: campos.categoriaId, ordem: proximaOrdem(itensDa(campos.categoriaId, true)), papel: null, arquivado: false, fixo: null };
-      db.itens.push(i);
-    }
-    i.nome = texto(campos.nome) || 'Item';
-    if (campos.papel !== undefined) i.papel = tipoDoItem(i.id) === 'entrada' && (campos.papel === 'diaria' || campos.papel === 'auxilio-saude') ? campos.papel : null;
-    if (campos.fixo !== undefined) {
-      // valor 0 = conta recorrente de valor variável (energia, água…): aparece todo mês, sem valor previsto.
-      if (campos.fixo) {
-        i.fixo = { valor: campos.fixo.valor > 0 ? campos.fixo.valor : 0, dia: Math.max(1, Math.min(31, Math.round(campos.fixo.dia) || 1)), desde: (i.fixo && i.fixo.desde) || UI.hoje().slice(0, 7) };
-      } else i.fixo = null;
-    }
-    if (campos.arquivado !== undefined) i.arquivado = !!campos.arquivado;
-    db.configurado = true;
-    salvar();
-    return i;
+  // Troca a posição de um item com o vizinho (delta -1 = sobe, +1 = desce) numa lista com `ordem`.
+  function mover(lista, item, delta) {
+    var ordenada = lista.slice().sort(porOrdem), i = ordenada.indexOf(item), j = i + delta;
+    if (i < 0 || j < 0 || j >= ordenada.length) return;
+    ordenada.splice(i, 1);
+    ordenada.splice(j, 0, item);
+    ordenada.forEach(function (x, k) { x.ordem = k + 1; });
   }
-  // Item com lançamentos é arquivado (some das listas, mas o histórico continua); sem lançamentos, é excluído.
-  function excluirItem(id) {
-    var usado = db.lancamentos.some(function (l) { return l.itemId === id; });
-    if (usado) { var i = item(id); i.arquivado = true; i.fixo = null; }
-    else db.itens = db.itens.filter(function (x) { return x.id !== id; });
-    db.configurado = true;
-    salvar();
-    return usado ? 'arquivado' : 'excluido';
-  }
+  function moverTreino(id, delta) { mover(treinos(), treino(id), delta); salvar(); }
 
-  // ---------- Lançamentos ----------
-  function lancamento(id) { return buscar(db.lancamentos, id); }
-  function salvarLancamento(campos, id) {
-    var l = id ? lancamento(id) : null;
-    if (!l) { l = { id: novoId(), criadoEm: Date.now(), mesFixo: null, pulado: false }; db.lancamentos.push(l); }
-    l.data = campos.data;
-    l.itemId = campos.itemId;
-    l.valor = Math.abs(Number(campos.valor) || 0);
-    l.descricao = texto(campos.descricao);
-    l.status = campos.status === 'previsto' ? 'previsto' : 'realizado';
-    l.missaoId = campos.missaoId || null;
-    if (campos.formaId !== undefined) {
-      var f = campos.formaId ? forma(campos.formaId) : null;
-      l.formaId = f && tipoDoItem(l.itemId) === 'gasto' ? f.id : null;
-      if (l.formaId && f.tipo === 'cartao') {
-        l.parcelas = Math.max(1, Math.min(48, Math.round(campos.parcelas) || 1));
-        l.primeiraFatura = campos.primeiraFatura || vencimentoPadrao(f, l.data);
-        l.status = 'realizado'; // a compra já aconteceu; o que fica em aberto é a fatura
-      } else { l.parcelas = null; l.primeiraFatura = null; }
-    }
-    if (campos.mesFixo !== undefined) l.mesFixo = campos.mesFixo || null;
-    if (campos.pulado !== undefined) l.pulado = !!campos.pulado;
-    salvar();
-    return l;
-  }
-  function excluirLancamento(id) {
-    db.lancamentos = db.lancamentos.filter(function (l) { return l.id !== id; });
-    salvar();
-  }
-
-  function diasNoMes(mes) { var p = mes.split('-'); return new Date(Number(p[0]), Number(p[1]), 0).getDate(); }
-
-  // ---------- Formas de pagamento e cartões ----------
-  function forma(id) { return buscar(db.formas, id); }
-  function formas(comArquivadas) { return db.formas.filter(function (f) { return comArquivadas || !f.arquivado; }).sort(porOrdem); }
-  function nomeDaForma(id) { var f = forma(id); return f ? f.nome : ''; }
-  function diaValido(v, padrao) { v = Math.round(Number(v)); return v >= 1 && v <= 31 ? v : padrao; }
-  function salvarForma(campos, id) {
-    var f = id ? forma(id) : null;
-    if (!f) { f = { id: novoId(), ordem: proximaOrdem(db.formas), arquivado: false }; db.formas.push(f); }
-    f.nome = texto(campos.nome) || 'Forma de pagamento';
-    f.tipo = campos.tipo === 'cartao' ? 'cartao' : 'avista';
-    f.fechamento = f.tipo === 'cartao' ? diaValido(campos.fechamento, 1) : null;
-    f.vencimento = f.tipo === 'cartao' ? diaValido(campos.vencimento, 10) : null;
-    db.configurado = true;
-    salvar();
-    return f;
-  }
-  // Forma já usada é arquivada (some das listas; o histórico e as faturas continuam).
-  function excluirForma(id) {
-    var usada = db.lancamentos.some(function (l) { return l.formaId === id; });
-    if (usada) forma(id).arquivado = true; else db.formas = db.formas.filter(function (f) { return f.id !== id; });
-    db.configurado = true;
-    salvar();
-    return usada ? 'arquivado' : 'excluido';
-  }
-  // m = ano * 12 + (mês - 1). O dia é limitado ao tamanho do mês (dia 31 em fevereiro vira 28).
-  function dataNoMes(m, dia) {
-    var mes = Math.floor(m / 12) + '-' + UI.pad(m % 12 + 1);
-    return mes + '-' + UI.pad(Math.min(dia, diasNoMes(mes)));
-  }
-  function somarMesesData(iso, n) { var p = iso.split('-'); return dataNoMes(Number(p[0]) * 12 + Number(p[1]) - 1 + n, Number(p[2])); }
-  // Vencimento da fatura em que cai uma compra feita em `dataCompra`: compras até o dia do fechamento entram
-  // na fatura que fecha naquele mês; depois dele, na do mês seguinte.
-  function vencimentoPadrao(f, dataCompra) {
-    var p = dataCompra.split('-'), m = Number(p[0]) * 12 + Number(p[1]) - 1;
-    if (Number(p[2]) > f.fechamento) m++;
-    if (f.vencimento <= f.fechamento) m++; // a fatura vence no mês seguinte ao do fechamento
-    return dataNoMes(m, f.vencimento);
-  }
-  function ehCompraCartao(l) { return !!(l && l.primeiraFatura); }
-  // Parcelas de uma compra no cartão: [{ numero, de, data (vencimento), valor }]. A última leva os centavos que sobram.
-  function parcelasDe(l) {
-    var n = l.parcelas || 1, base = Math.floor(l.valor * 100 / n) / 100, lista = [];
-    for (var k = 0; k < n; k++) {
-      lista.push({ l: l, numero: k + 1, de: n, data: somarMesesData(l.primeiraFatura, k), valor: k < n - 1 ? base : Math.round((l.valor - base * (n - 1)) * 100) / 100 });
-    }
-    return lista;
-  }
-  function chaveFatura(formaId, data) { return formaId + '|' + data; }
-  // Faturas de cartão: filtro(dataDeVencimento) diz quais interessam. Cada uma soma as parcelas que vencem naquele dia.
-  function faturas(filtro) {
-    var mapa = {};
-    db.lancamentos.forEach(function (l) {
-      if (!ehCompraCartao(l) || l.pulado) return;
-      parcelasDe(l).forEach(function (p) {
-        if (filtro && !filtro(p.data)) return;
-        var chave = chaveFatura(l.formaId, p.data);
-        var f = mapa[chave] || (mapa[chave] = { fatura: true, id: null, chave: chave, formaId: l.formaId, data: p.data, valor: 0, parcelas: [],
-          pagaEm: db.faturasPagas[chave] || null });
-        f.valor = Math.round((f.valor + p.valor) * 100) / 100;
-        f.parcelas.push(p);
-      });
+  function exercicio(treinoId, exId) { var t = treino(treinoId); return t ? buscar(t.exercicios, exId) : null; }
+  function exercicios(treinoId) { var t = treino(treinoId); return t ? t.exercicios.slice().sort(porOrdem) : []; }
+  function salvarExercicio(treinoId, campos, exId) {
+    var t = treino(treinoId), e = exId ? buscar(t.exercicios, exId) : null;
+    if (!e) { e = { id: novoId(), ordem: proximaOrdem(t.exercicios) }; t.exercicios.push(e); }
+    e.nome = texto(campos.nome) || 'Exercício';
+    e.carga = numero(campos.carga, 0, 1000, 0);
+    e.descanso = numero(campos.descanso, 0, 30, 0);
+    e.obs = texto(campos.obs);
+    var series = (campos.series || []).map(function (s) {
+      return { rotulo: ROTULOS_SERIE.some(function (r) { return r[0] === s.rotulo; }) ? s.rotulo : 'normal', pct: numero(s.pct, 0, 200, 100), reps: texto(s.reps) };
     });
-    return Object.keys(mapa).map(function (k) { var f = mapa[k]; f.status = f.pagaEm ? 'realizado' : 'previsto'; return f; })
-      .sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+    e.series = series.length ? series : SERIES_PADRAO.map(function (s) { return Object.assign({}, s); });
+    salvar();
+    return e;
   }
-  function marcarFatura(chave, paga) {
-    if (paga) db.faturasPagas[chave] = UI.hoje(); else delete db.faturasPagas[chave];
+  function excluirExercicio(treinoId, exId) {
+    var t = treino(treinoId);
+    t.exercicios = t.exercicios.filter(function (e) { return e.id !== exId; });
     salvar();
   }
+  function moverExercicio(treinoId, exId, delta) { var t = treino(treinoId); mover(t.exercicios, buscar(t.exercicios, exId), delta); salvar(); }
 
-  // Tudo o que cai num mês ('AAAA-MM'): lançamentos reais (as compras no cartão aparecem no dia da compra, mas não
-  // contam como gasto), faturas de cartão que vencem no mês e contas fixas ainda em aberto (virtuais, não gravadas).
-  // Uma conta fixa deixa de aparecer como prevista quando existe lançamento com `mesFixo` daquele mês.
-  function lancamentosDoMes(mes) {
-    var lista = db.lancamentos.filter(function (l) { return l.data && l.data.slice(0, 7) === mes && !l.pulado; });
-    lista = lista.concat(faturas(function (data) { return data.slice(0, 7) === mes; }));
-    var quitados = {};
-    // Também vale um lançamento comum do mesmo item feito no mês (ex.: conta paga adiantada, antes do vencimento).
-    db.lancamentos.forEach(function (l) {
-      if (l.mesFixo ? l.mesFixo === mes : (l.data && l.data.slice(0, 7) === mes)) quitados[l.itemId] = true;
-    });
-    db.itens.forEach(function (i) {
-      if (!i.fixo || i.arquivado || quitados[i.id] || mes < i.fixo.desde) return;
-      var dia = Math.min(i.fixo.dia, diasNoMes(mes));
-      lista.push({ id: null, virtual: true, data: mes + '-' + UI.pad(dia), itemId: i.id, valor: i.fixo.valor, descricao: '', status: 'previsto', missaoId: null, mesFixo: mes });
-    });
-    return lista.sort(function (a, b) { return a.data === b.data ? (a.criadoEm || 0) - (b.criadoEm || 0) : (a.data < b.data ? -1 : 1); });
+  // Carga de uma série: % da carga principal, arredondada para múltiplos de 1 kg.
+  function cargaDaSerie(carga, serie) { return Math.round((Number(carga) || 0) * (Number(serie.pct) || 0) / 100); }
+
+  // ---------- Registro dos treinos ----------
+  function registro(id) { return buscar(db.registros, id); }
+  function treinoEmAndamento() { return db.registros.filter(function (r) { return !r.fim; })[0] || null; }
+  // Treinos já finalizados, do mais recente para o mais antigo (opcional: só os de um treino).
+  function historico(treinoId) {
+    return db.registros.filter(function (r) { return r.fim && (!treinoId || r.treinoId === treinoId); })
+      .sort(function (a, b) { return (b.inicio || 0) - (a.inicio || 0); });
   }
-
-  // Contas recorrentes (gastos) ainda em aberto que vencem nos próximos `dias` dias ou já venceram neste mês.
-  function contasAVencer(dias) {
-    var hoje = UI.hoje(), limite = UI.somarDias(hoje, dias == null ? 7 : dias), mes = hoje.slice(0, 7), lista = [];
-    [mes, UI.somarMeses(mes, 1)].forEach(function (m) {
-      lancamentosDoMes(m).forEach(function (l) { if (l.virtual && l.data <= limite && tipoDoItem(l.itemId) === 'gasto') lista.push(l); });
-    });
-    return lista;
-  }
-
-  // Totais do mês: realizado e previsto (o que ainda falta pagar/receber), por tipo e por categoria.
-  function resumoDoMes(mes) {
-    var r = { entradas: 0, gastos: 0, entradasPrevistas: 0, gastosPrevistos: 0, comprasNoCartao: 0, categorias: {}, itens: {} };
-    function somar(itemId, valor, previsto) {
-      if (tipoDoItem(itemId) === 'entrada') r[previsto ? 'entradasPrevistas' : 'entradas'] += valor;
-      else r[previsto ? 'gastosPrevistos' : 'gastos'] += valor;
-      var c = categoriaDoItem(itemId), cid = c ? c.id : '?';
-      var rc = r.categorias[cid] || (r.categorias[cid] = { realizado: 0, previsto: 0 });
-      var ri = r.itens[itemId] || (r.itens[itemId] = { realizado: 0, previsto: 0 });
-      rc[previsto ? 'previsto' : 'realizado'] += valor;
-      ri[previsto ? 'previsto' : 'realizado'] += valor;
-    }
-    lancamentosDoMes(mes).forEach(function (l) {
-      // Fatura: cada parcela conta na categoria da compra, no mês em que a fatura vence.
-      if (l.fatura) l.parcelas.forEach(function (p) { somar(p.l.itemId, p.valor, !l.pagaEm); });
-      else if (ehCompraCartao(l)) r.comprasNoCartao += l.valor; // o gasto entra pelas faturas
-      else somar(l.itemId, l.valor, l.status === 'previsto');
-    });
-    r.saldo = r.entradas - r.gastos;
-    r.saldoPrevisto = r.saldo + r.entradasPrevistas - r.gastosPrevistos;
+  function iniciarTreino(treinoId) {
+    var atual = treinoEmAndamento();
+    if (atual) return atual;
+    var t = treino(treinoId);
+    var r = { id: novoId(), treinoId: t.id, nomeTreino: t.nome, tipo: t.tipo, data: UI.hoje(), inicio: Date.now(), fim: null, exercicios: [], corrida: null, obs: '' };
+    db.registros.push(r);
+    salvar();
     return r;
   }
-
-  // ---------- Missões (diárias × gastos fora da circunscrição) ----------
-  function missao(id) { return buscar(db.missoes, id); }
-  function missoes() {
-    return db.missoes.slice().sort(function (a, b) { return (b.inicio || '') < (a.inicio || '') ? -1 : (b.inicio || '') > (a.inicio || '') ? 1 : (b.criadoEm || 0) - (a.criadoEm || 0); });
-  }
-  function salvarMissao(campos, id) {
-    var m = id ? missao(id) : null;
-    if (!m) { m = { id: novoId(), criadoEm: Date.now() }; db.missoes.push(m); }
-    m.nome = texto(campos.nome) || 'Missão';
-    m.destino = texto(campos.destino);
-    m.inicio = campos.inicio || null;
-    m.fim = campos.fim || null;
+  function feitoNoRegistro(r, exId) { return r ? buscar(r.exercicios.map(function (x) { return Object.assign({ id: x.exercicioId }, x); }), exId) : null; }
+  // Concluir um exercício: guarda carga e repetições da última série, e a carga vira a principal do próximo treino.
+  function concluirExercicio(registroId, exId, carga, reps) {
+    var r = registro(registroId), e = exercicio(r.treinoId, exId);
+    var item = { exercicioId: exId, nome: e ? e.nome : '', carga: numero(carga, 0, 1000, 0), reps: Math.round(numero(reps, 0, 999, 0)), concluidoEm: Date.now() };
+    r.exercicios = r.exercicios.filter(function (x) { return x.exercicioId !== exId; }).concat([item]);
+    if (e && item.carga > 0) e.carga = item.carga;
     salvar();
-    return m;
+    return item;
   }
-  // Os lançamentos continuam existindo, só deixam de pertencer à missão.
-  function excluirMissao(id) {
-    db.lancamentos.forEach(function (l) { if (l.missaoId === id) l.missaoId = null; });
-    db.missoes = db.missoes.filter(function (m) { return m.id !== id; });
+  function desfazerExercicio(registroId, exId) {
+    var r = registro(registroId);
+    r.exercicios = r.exercicios.filter(function (x) { return x.exercicioId !== exId; });
     salvar();
   }
-  // filtro (opcional): função que recebe o lançamento e diz se ele entra na conta (ex.: só os de um mês).
-  function saldoDaMissao(id, filtro) {
-    var r = { recebido: 0, gasto: 0, aReceber: 0, aGastar: 0, lancamentos: [] };
-    db.lancamentos.forEach(function (l) {
-      if (l.missaoId !== id || l.pulado || (filtro && !filtro(l))) return;
-      var entrada = tipoDoItem(l.itemId) === 'entrada', previsto = l.status === 'previsto';
-      if (entrada) r[previsto ? 'aReceber' : 'recebido'] += l.valor; else r[previsto ? 'aGastar' : 'gasto'] += l.valor;
-      r.lancamentos.push(l);
+  // Finaliza o treino e marca o dia nas metas recorrentes ligadas a treino. Devolve os nomes das metas marcadas.
+  function finalizarTreino(registroId, extra) {
+    var r = registro(registroId);
+    extra = extra || {};
+    r.fim = Date.now();
+    if (extra.km != null && r.tipo === 'corrida') r.corrida = { km: numero(extra.km, 0, 500, 0) };
+    if (extra.obs != null) r.obs = texto(extra.obs);
+    var marcadas = [];
+    db.habitos.forEach(function (h) {
+      if (!h.treino || !habitoValeNoDia(h, r.data) || h.feitos[r.data]) return;
+      h.feitos[r.data] = 1;
+      marcadas.push(h.titulo);
     });
-    r.lancamentos.sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
-    r.saldo = r.recebido - r.gasto;
-    return r;
+    salvar();
+    return marcadas;
   }
-
-  // ---------- Saúde (gastos × Auxílio Saúde) ----------
-  function ehGastoSaude(l) { var c = categoriaDoItem(l.itemId); return !!(c && c.tipo === 'gasto' && c.papel === 'saude'); }
-  function ehAuxilioSaude(l) { var i = item(l.itemId); return !!(i && i.papel === 'auxilio-saude'); }
-  // prefixo: 'AAAA-MM' (um mês) ou 'AAAA' (um ano). Conta só o que já foi pago/recebido.
-  function saldoSaude(prefixo) {
-    var r = { gasto: 0, reembolso: 0 };
-    db.lancamentos.forEach(function (l) {
-      if (l.pulado || l.status === 'previsto' || !l.data || l.data.indexOf(prefixo) !== 0) return;
-      if (ehGastoSaude(l)) r.gasto += l.valor; else if (ehAuxilioSaude(l)) r.reembolso += l.valor;
+  function cancelarTreino(registroId) { db.registros = db.registros.filter(function (r) { return r.id !== registroId; }); salvar(); }
+  function excluirRegistro(id) { cancelarTreino(id); }
+  function duracaoSeg(r) { return Math.max(0, Math.round(((r.fim || Date.now()) - (r.inicio || Date.now())) / 1000)); }
+  // Último resultado de um exercício em treinos já finalizados: { carga, reps, data }.
+  function ultimoResultado(exId) {
+    var h = historico();
+    for (var i = 0; i < h.length; i++) {
+      var x = h[i].exercicios.filter(function (e) { return e.exercicioId === exId; })[0];
+      if (x) return { carga: x.carga, reps: x.reps, data: h[i].data };
+    }
+    return null;
+  }
+  var XP_TREINO = { base: 50, exercicio: 10 };
+  function xpDoRegistro(r) { return XP_TREINO.base + XP_TREINO.exercicio * r.exercicios.length; }
+  function xpDosTreinos(hoje) {
+    var r = { xp: 0, hoje: 0, feitos: 0 };
+    historico().forEach(function (x) {
+      var v = xpDoRegistro(x);
+      r.xp += v; r.feitos++;
+      if (x.data === hoje) r.hoje += v;
     });
-    r.saldo = r.reembolso - r.gasto;
     return r;
   }
 
@@ -448,13 +303,9 @@ var Dados = (function () {
     var hoje = UI.hoje();
     return db.lembretes.filter(function (l) { var s = situacaoLembrete(l, hoje); return s === 'atrasado' || s === 'hoje' || s === 'ativo'; }).sort(ordemLembrete);
   }
-  // Lembretes que aparecem num dia do calendário: os daquele dia e os prazos que vencem nele.
-  function lembretesDoDia(iso) {
-    return db.lembretes.filter(function (l) { return dataLimite(l) === iso; }).sort(ordemLembrete);
-  }
 
-  // ---------- Metas ----------
-  var AREAS = [['financeiro', 'Financeiro'], ['fisico', 'Físico'], ['geral', 'Geral']];
+  // ---------- Metas de longo prazo ----------
+  var AREAS = [['estudos', 'Estudos'], ['treino', 'Treino'], ['dieta', 'Dieta'], ['habitos', 'Hábitos']];
   var DIFICULDADES = [['facil', 'Fácil', 100], ['media', 'Média', 250], ['dificil', 'Difícil', 600], ['epica', 'Épica', 1500]];
   function meta(id) { return buscar(db.metas, id); }
   function salvarMeta(campos, id) {
@@ -462,7 +313,7 @@ var Dados = (function () {
     if (!m) { m = { id: novoId(), criadoEm: Date.now(), concluida: false, dataConclusao: null }; db.metas.push(m); }
     m.titulo = texto(campos.titulo) || 'Meta';
     m.descricao = texto(campos.descricao);
-    m.area = AREAS.some(function (a) { return a[0] === campos.area; }) ? campos.area : 'geral';
+    m.area = AREAS.some(function (a) { return a[0] === campos.area; }) ? campos.area : 'habitos';
     m.dificuldade = DIFICULDADES.some(function (d) { return d[0] === campos.dificuldade; }) ? campos.dificuldade : 'media';
     m.prazo = campos.prazo || null;
     salvar();
@@ -497,6 +348,7 @@ var Dados = (function () {
     var dias = (campos.dias || []).map(Number).filter(function (d) { return d >= 0 && d <= 6; });
     h.dias = h.periodo === 'dia' ? (dias.length ? dias : [0, 1, 2, 3, 4, 5, 6]) : [];
     h.vezes = h.periodo === 'dia' ? 1 : Math.max(1, Math.min(h.periodo === 'semana' ? 7 : 31, Math.round(campos.vezes) || 1));
+    if (campos.treino !== undefined) h.treino = !!campos.treino;
     salvar();
     return h;
   }
@@ -531,16 +383,6 @@ var Dados = (function () {
     }
     return n;
   }
-  // Metas diárias de um dia: { total, feitas } (para o calendário). Só conta dias a partir da criação da meta.
-  function resumoHabitosDoDia(iso) {
-    var r = { total: 0, feitas: 0 };
-    db.habitos.forEach(function (h) {
-      if (h.periodo !== 'dia' || !habitoValeNoDia(h, iso) || (iso < h.desde && !h.feitos[iso])) return;
-      r.total++;
-      if (h.feitos[iso]) r.feitas++;
-    });
-    return r;
-  }
   // XP das metas recorrentes: cada dia cumprido (diárias) e cada semana ou mês em que o alvo foi atingido.
   function xpDosHabitos(hoje) {
     var r = { xp: 0, hoje: 0, cumpridas: 0 };
@@ -564,22 +406,20 @@ var Dados = (function () {
 
   return {
     get db() { return db; },
-    forma: forma, formas: formas, nomeDaForma: nomeDaForma, salvarForma: salvarForma, excluirForma: excluirForma,
-    vencimentoPadrao: vencimentoPadrao, ehCompraCartao: ehCompraCartao, parcelasDe: parcelasDe, faturas: faturas, marcarFatura: marcarFatura,
+    salvar: salvar, substituir: substituir, exportar: exportar, importar: importar, limpar: limpar, semDados: semDados, ehDoPrograma: ehDoPrograma,
+    atualizarPerfil: atualizarPerfil,
+    TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, SERIES_PADRAO: SERIES_PADRAO,
+    treino: treino, treinos: treinos, salvarTreino: salvarTreino, excluirTreino: excluirTreino, moverTreino: moverTreino,
+    exercicio: exercicio, exercicios: exercicios, salvarExercicio: salvarExercicio, excluirExercicio: excluirExercicio, moverExercicio: moverExercicio,
+    cargaDaSerie: cargaDaSerie,
+    registro: registro, treinoEmAndamento: treinoEmAndamento, historico: historico, iniciarTreino: iniciarTreino, feitoNoRegistro: feitoNoRegistro,
+    concluirExercicio: concluirExercicio, desfazerExercicio: desfazerExercicio, finalizarTreino: finalizarTreino, cancelarTreino: cancelarTreino,
+    excluirRegistro: excluirRegistro, duracaoSeg: duracaoSeg, ultimoResultado: ultimoResultado, XP_TREINO: XP_TREINO, xpDoRegistro: xpDoRegistro, xpDosTreinos: xpDosTreinos,
+    lembrete: lembrete, salvarLembrete: salvarLembrete, concluirLembrete: concluirLembrete, excluirLembrete: excluirLembrete,
+    dataLimite: dataLimite, situacaoLembrete: situacaoLembrete, lembretesAtivos: lembretesAtivos, ordemLembrete: ordemLembrete,
+    AREAS: AREAS, DIFICULDADES: DIFICULDADES, meta: meta, salvarMeta: salvarMeta, concluirMeta: concluirMeta, excluirMeta: excluirMeta, xpDaMeta: xpDaMeta,
     PERIODOS: PERIODOS, XP_HABITO: XP_HABITO, habito: habito, habitos: habitos, salvarHabito: salvarHabito, excluirHabito: excluirHabito,
     marcarHabito: marcarHabito, habitoValeNoDia: habitoValeNoDia, progressoHabito: progressoHabito, sequenciaHabito: sequenciaHabito,
-    resumoHabitosDoDia: resumoHabitosDoDia, xpDosHabitos: xpDosHabitos, diaDaSemana: diaDaSemana,
-    salvar: salvar, substituir: substituir, exportar: exportar, importar: importar, limpar: limpar, semDados: semDados,
-    atualizarPerfil: atualizarPerfil,
-    categoria: categoria, item: item, categorias: categorias, itensDa: itensDa, categoriaDoItem: categoriaDoItem,
-    tipoDoItem: tipoDoItem, nomeDoItem: nomeDoItem, corDoItem: corDoItem,
-    salvarCategoria: salvarCategoria, excluirCategoria: excluirCategoria, salvarItem: salvarItem, excluirItem: excluirItem,
-    lancamento: lancamento, salvarLancamento: salvarLancamento, excluirLancamento: excluirLancamento,
-    contasAVencer: contasAVencer, lancamentosDoMes: lancamentosDoMes, resumoDoMes: resumoDoMes, diasNoMes: diasNoMes,
-    missao: missao, missoes: missoes, salvarMissao: salvarMissao, excluirMissao: excluirMissao, saldoDaMissao: saldoDaMissao,
-    saldoSaude: saldoSaude, ehGastoSaude: ehGastoSaude, ehAuxilioSaude: ehAuxilioSaude,
-    lembrete: lembrete, salvarLembrete: salvarLembrete, concluirLembrete: concluirLembrete, excluirLembrete: excluirLembrete,
-    dataLimite: dataLimite, situacaoLembrete: situacaoLembrete, lembretesAtivos: lembretesAtivos, lembretesDoDia: lembretesDoDia, ordemLembrete: ordemLembrete,
-    AREAS: AREAS, DIFICULDADES: DIFICULDADES, meta: meta, salvarMeta: salvarMeta, concluirMeta: concluirMeta, excluirMeta: excluirMeta, xpDaMeta: xpDaMeta
+    xpDosHabitos: xpDosHabitos, diaDaSemana: diaDaSemana
   };
 })();
