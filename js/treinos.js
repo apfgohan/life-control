@@ -335,7 +335,7 @@ var Treinos = (function () {
       { texto: 'Continuar treinando', classe: 'btn-secundario' },
       { texto: 'Finalizar', classe: 'btn-primario', acao: function () {
         var marcadas = Dados.finalizarTreino(r.id, { km: corrida ? km.value : null, obs: obs.value });
-        UI.aviso('Treino finalizado · +' + Dados.xpDoRegistro(r) + ' XP' + (marcadas.length ? ' · meta "' + marcadas[0] + '" marcada' : ''));
+        UI.aviso('Treino finalizado · +' + Dados.xpDoRegistro(r) + ' XP' + (marcadas.length ? ' · meta "' + marcadas[0] + '" cumprida' : ''));
         location.hash = '#/inicio';
         App.atualizar();
       } }

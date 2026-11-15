@@ -55,7 +55,7 @@ var Dados = (function () {
     d.dieta.refeicoes.forEach(function (r) { if (!Array.isArray(r.itens)) r.itens = []; });
     if (!d.alimentacao || typeof d.alimentacao !== 'object') d.alimentacao = {};
     d.medidas.forEach(function (m) { if (!m.fotos || typeof m.fotos !== 'object') m.fotos = {}; });
-    d.habitos.forEach(function (h) { if (!h.feitos || typeof h.feitos !== 'object') h.feitos = {}; if (!Array.isArray(h.dias)) h.dias = []; });
+    d.habitos.forEach(normalizarHabito);
     d.treinos.forEach(function (t) {
       if (!Array.isArray(t.exercicios)) t.exercicios = [];
       t.exercicios.forEach(function (e) {
@@ -288,21 +288,16 @@ var Dados = (function () {
     r.exercicios = r.exercicios.filter(function (x) { return x.exercicioId !== exId; });
     salvar();
   }
-  // Finaliza o treino e marca o dia nas metas recorrentes ligadas a treino. Devolve os nomes das metas marcadas.
+  // Finaliza o treino. Devolve os nomes das metas de treino que este treino fez bater (as metas são calculadas).
   function finalizarTreino(registroId, extra) {
     var r = registro(registroId);
     extra = extra || {};
+    var antes = db.habitos.filter(function (h) { return h.medida === 'treinos' && !progressoHabito(h, r.data).completo; });
     r.fim = Date.now();
     if (extra.km != null && r.tipo === 'corrida') r.corrida = { km: numero(extra.km, 0, 500, 0) };
     if (extra.obs != null) r.obs = texto(extra.obs);
-    var marcadas = [];
-    db.habitos.forEach(function (h) {
-      if (!h.treino || !habitoValeNoDia(h, r.data) || h.feitos[r.data]) return;
-      h.feitos[r.data] = 1;
-      marcadas.push(h.titulo);
-    });
     salvar();
-    return marcadas;
+    return antes.filter(function (h) { return progressoHabito(h, r.data).completo; }).map(function (h) { return h.titulo; });
   }
   function cancelarTreino(registroId) { db.registros = db.registros.filter(function (r) { return r.id !== registroId; }); salvar(); }
   function excluirRegistro(id) { cancelarTreino(id); }
@@ -554,8 +549,43 @@ var Dados = (function () {
   }
 
   // ---------- Metas recorrentes (diárias, semanais e mensais) ----------
+  // Cada meta tem área, período, o que mede e um alvo. Treino, Dieta e Estudo são calculados dos registros;
+  // Hábito é marcado à mão (h.feitos). Pontos: base do período × dificuldade, por período cumprido.
   var PERIODOS = [['dia', 'Diária'], ['semana', 'Semanal'], ['mes', 'Mensal']];
-  var XP_HABITO = { dia: 10, semana: 50, mes: 150 }; // por dia cumprido / por semana ou mês em que o alvo foi atingido
+  var AREAS_HABITO = [['estudo', 'Estudo'], ['treino', 'Treino'], ['dieta', 'Dieta'], ['habito', 'Hábito']];
+  // [id, área, nome, unidade (singular, plural)]
+  var MEDIDAS_HABITO = [
+    ['horas', 'estudo', 'Horas de estudo', 'h', 'h'],
+    ['treinos', 'treino', 'Treinos feitos', 'treino', 'treinos'],
+    ['dias100', 'dieta', 'Dias 100% na dieta', 'dia', 'dias'],
+    ['refeicoes', 'dieta', 'Refeições na dieta', 'refeição', 'refeições'],
+    ['manual', 'habito', 'Marcar quando fizer', 'vez', 'vezes']
+  ];
+  var XP_PERIODO = { dia: 10, semana: 60, mes: 250 };
+  var DIFICULDADE_HABITO = [['facil', 'Fácil', 1], ['media', 'Média', 1.5], ['dificil', 'Difícil', 2]];
+  var XP_HABITO = XP_PERIODO; // compatibilidade
+
+  function medidaHabito(id) { return MEDIDAS_HABITO.filter(function (m) { return m[0] === id; })[0] || MEDIDAS_HABITO[4]; }
+  function xpDoHabito(h) {
+    var d = DIFICULDADE_HABITO.filter(function (x) { return x[0] === h.dificuldade; })[0] || DIFICULDADE_HABITO[0];
+    return Math.round(XP_PERIODO[h.periodo] * d[2]);
+  }
+  // Metas antigas (só manuais, com "marcar ao treinar") viram o modelo novo.
+  function normalizarHabito(h) {
+    if (!h.feitos || typeof h.feitos !== 'object') h.feitos = {};
+    if (!Array.isArray(h.dias)) h.dias = [];
+    if (!h.area) {
+      if (h.treino) { h.area = 'treino'; h.medida = 'treinos'; }
+      else { h.area = 'habito'; h.medida = 'manual'; }
+      h.alvo = h.periodo === 'dia' ? 1 : (h.vezes || 1);
+      delete h.treino; delete h.vezes;
+    }
+    if (!h.medida) h.medida = medidaHabito(null)[0];
+    if (!(h.alvo > 0)) h.alvo = 1;
+    if (!h.dificuldade) h.dificuldade = 'facil';
+    if (h.periodo === 'dia' && !h.dias.length) h.dias = [0, 1, 2, 3, 4, 5, 6];
+    return h;
+  }
   function habito(id) { return buscar(db.habitos, id); }
   function habitos() {
     var ordem = { dia: 0, semana: 1, mes: 2 };
@@ -566,10 +596,16 @@ var Dados = (function () {
     if (!h) { h = { id: novoId(), criadoEm: Date.now(), desde: UI.hoje(), feitos: {} }; db.habitos.push(h); }
     h.titulo = texto(campos.titulo) || 'Meta';
     h.periodo = PERIODOS.some(function (p) { return p[0] === campos.periodo; }) ? campos.periodo : 'dia';
+    h.area = AREAS_HABITO.some(function (a) { return a[0] === campos.area; }) ? campos.area : 'habito';
+    var m = MEDIDAS_HABITO.filter(function (x) { return x[0] === campos.medida && x[1] === h.area; })[0] || MEDIDAS_HABITO.filter(function (x) { return x[1] === h.area; })[0];
+    h.medida = m[0];
     var dias = (campos.dias || []).map(Number).filter(function (d) { return d >= 0 && d <= 6; });
     h.dias = h.periodo === 'dia' ? (dias.length ? dias : [0, 1, 2, 3, 4, 5, 6]) : [];
-    h.vezes = h.periodo === 'dia' ? 1 : Math.max(1, Math.min(h.periodo === 'semana' ? 7 : 31, Math.round(campos.vezes) || 1));
-    if (campos.treino !== undefined) h.treino = !!campos.treino;
+    h.alvo = numero(campos.alvo, 0.1, 10000, 1);
+    if (h.medida !== 'horas') h.alvo = Math.max(1, Math.round(h.alvo));
+    if (h.medida === 'manual' && h.periodo === 'dia') h.alvo = 1;
+    h.dificuldade = DIFICULDADE_HABITO.some(function (d) { return d[0] === campos.dificuldade; }) ? campos.dificuldade : 'facil';
+    delete h.treino; delete h.vezes;
     salvar();
     return h;
   }
@@ -581,47 +617,87 @@ var Dados = (function () {
     salvar();
   }
   function diaDaSemana(iso) { return (new Date(iso + 'T00:00:00').getDay() + 6) % 7; } // 0 = segunda
-  // A meta diária vale nos dias da semana escolhidos; as semanais e mensais podem ser cumpridas em qualquer dia.
+  // A meta diária vale nos dias da semana escolhidos; as semanais e mensais, em qualquer dia.
   function habitoValeNoDia(h, iso) { return h.periodo !== 'dia' || h.dias.indexOf(diaDaSemana(iso)) >= 0; }
   function periodoDoHabito(h, iso) {
     if (h.periodo === 'semana') { var ini = UI.somarDias(iso, -diaDaSemana(iso)); return { inicio: ini, fim: UI.somarDias(ini, 6) }; }
     if (h.periodo === 'mes') return { inicio: iso.slice(0, 7) + '-01', fim: iso.slice(0, 7) + '-' + UI.pad(diasNoMes(iso.slice(0, 7))) };
     return { inicio: iso, fim: iso };
   }
-  // Quantas vezes foi cumprida no período (semana ou mês) que contém o dia, e o alvo.
-  function progressoHabito(h, iso) {
-    var p = periodoDoHabito(h, iso), n = 0;
-    Object.keys(h.feitos).forEach(function (d) { if (d >= p.inicio && d <= p.fim) n++; });
-    return { feitas: n, alvo: h.vezes || 1, completo: n >= (h.vezes || 1), periodo: p };
-  }
-  // Dias seguidos (entre os dias em que a meta vale) cumprindo a meta diária; hoje ainda em aberto não quebra a sequência.
-  function sequenciaHabito(h) {
-    var d = UI.hoje(), n = 0;
-    for (var i = 0; i < 400; i++, d = UI.somarDias(d, -1)) {
-      if (d < h.desde && !h.feitos[d]) break;
-      if (!habitoValeNoDia(h, d)) continue;
-      if (h.feitos[d]) n++; else if (i > 0) break;
+  // Valor medido entre duas datas (inclusivas), até hoje.
+  function medir(h, inicio, fim) {
+    var hoje = UI.hoje();
+    if (fim > hoje) fim = hoje;
+    if (fim < inicio) return 0;
+    if (h.medida === 'horas') return window.Estudos ? Estudos.horasEntre(inicio, fim) : 0;
+    if (h.medida === 'treinos') return db.registros.filter(function (r) { return r.fim && r.data >= inicio && r.data <= fim; }).length;
+    if (h.medida === 'manual') return Object.keys(h.feitos).filter(function (d) { return d >= inicio && d <= fim; }).length;
+    var n = 0;
+    for (var d = inicio, i = 0; d <= fim && i < 400; d = UI.somarDias(d, 1), i++) {
+      var s = resumoDieta(d, hoje);
+      if (h.medida === 'refeicoes') n += s.dieta;
+      else if (s.total && s.dieta === s.total) n++;
     }
     return n;
   }
-  // XP das metas recorrentes: cada dia cumprido (diárias) e cada semana ou mês em que o alvo foi atingido.
+  // Progresso no período (dia, semana ou mês) que contém o dia.
+  function progressoHabito(h, iso) {
+    var p = periodoDoHabito(h, iso), v = medir(h, p.inicio, p.fim);
+    return { feitas: v, alvo: h.alvo || 1, completo: v >= (h.alvo || 1) - 1e-9, periodo: p, pct: Math.min(100, v / (h.alvo || 1) * 100) };
+  }
+  function habitoCumpridoNoDia(h, iso) { return progressoHabito(h, iso).completo; }
+  // Dias seguidos cumprindo a meta diária (só os dias em que ela vale); hoje ainda em aberto não quebra a sequência.
+  function sequenciaHabito(h) {
+    if (h.periodo !== 'dia') return 0;
+    var d = UI.hoje(), n = 0;
+    for (var i = 0; i < 400; i++, d = UI.somarDias(d, -1)) {
+      if (d < h.desde) break;
+      if (!habitoValeNoDia(h, d)) continue;
+      if (habitoCumpridoNoDia(h, d)) n++; else if (i > 0) break;
+    }
+    return n;
+  }
+  // Inícios dos períodos de uma meta, da criação até hoje.
+  function periodosAteHoje(h) {
+    var hoje = UI.hoje(), l = [], d = periodoDoHabito(h, h.desde || hoje).inicio;
+    for (var i = 0; d <= hoje && i < 3700; i++) {
+      if (h.periodo === 'dia') { if (habitoValeNoDia(h, d)) l.push(d); d = UI.somarDias(d, 1); }
+      else if (h.periodo === 'semana') { l.push(d); d = UI.somarDias(d, 7); }
+      else { l.push(d); d = UI.somarMeses(d.slice(0, 7), 1) + '-01'; }
+    }
+    return l;
+  }
+  // XP das metas recorrentes: cada período cumprido (o atual conta assim que o alvo é atingido).
   function xpDosHabitos(hoje) {
     var r = { xp: 0, hoje: 0, cumpridas: 0 };
     db.habitos.forEach(function (h) {
-      if (h.periodo === 'dia') {
-        var n = Object.keys(h.feitos).length;
-        r.xp += n * XP_HABITO.dia; r.cumpridas += n;
-        if (h.feitos[hoje]) r.hoje += XP_HABITO.dia;
-        return;
-      }
-      var grupos = {};
-      Object.keys(h.feitos).forEach(function (d) { var k = periodoDoHabito(h, d).inicio; grupos[k] = (grupos[k] || 0) + 1; });
-      Object.keys(grupos).forEach(function (k) {
-        if (grupos[k] < (h.vezes || 1)) return;
-        r.xp += XP_HABITO[h.periodo]; r.cumpridas++;
-        if (k === periodoDoHabito(h, hoje).inicio && h.feitos[hoje] && grupos[k] === (h.vezes || 1)) r.hoje += XP_HABITO[h.periodo];
+      var valor = xpDoHabito(h);
+      periodosAteHoje(h).forEach(function (ini) {
+        if (!progressoHabito(h, ini).completo) return;
+        r.xp += valor; r.cumpridas++;
+        if (ini === periodoDoHabito(h, hoje).inicio) r.hoje += valor;
       });
     });
+    return r;
+  }
+  // Para o Dashboard: metas cumpridas sobre as possíveis numa semana (diárias: cada dia; semanais: a semana).
+  function cumprimentoNaSemana(seg) {
+    var hoje = UI.hoje(), r = { feitas: 0, possiveis: 0 };
+    db.habitos.forEach(function (h) {
+      if (h.periodo === 'dia') {
+        for (var i = 0; i < 7; i++) {
+          var d = UI.somarDias(seg, i);
+          if (d > hoje || d < h.desde || !habitoValeNoDia(h, d)) continue;
+          r.possiveis++;
+          if (habitoCumpridoNoDia(h, d)) r.feitas++;
+        }
+      } else if (h.periodo === 'semana') {
+        if (UI.somarDias(seg, 6) < h.desde || seg > hoje) return;
+        r.possiveis++;
+        if (progressoHabito(h, seg).completo) r.feitas++;
+      }
+    });
+    r.pct = r.possiveis ? Math.round(r.feitas / r.possiveis * 100) : null;
     return r;
   }
 
@@ -646,7 +722,9 @@ var Dados = (function () {
     lembrete: lembrete, salvarLembrete: salvarLembrete, concluirLembrete: concluirLembrete, excluirLembrete: excluirLembrete,
     dataLimite: dataLimite, situacaoLembrete: situacaoLembrete, lembretesAtivos: lembretesAtivos, ordemLembrete: ordemLembrete,
     AREAS: AREAS, DIFICULDADES: DIFICULDADES, meta: meta, salvarMeta: salvarMeta, concluirMeta: concluirMeta, excluirMeta: excluirMeta, xpDaMeta: xpDaMeta,
-    PERIODOS: PERIODOS, XP_HABITO: XP_HABITO, habito: habito, habitos: habitos, salvarHabito: salvarHabito, excluirHabito: excluirHabito,
+    PERIODOS: PERIODOS, XP_HABITO: XP_HABITO, AREAS_HABITO: AREAS_HABITO, MEDIDAS_HABITO: MEDIDAS_HABITO, XP_PERIODO: XP_PERIODO,
+    DIFICULDADE_HABITO: DIFICULDADE_HABITO, medidaHabito: medidaHabito, xpDoHabito: xpDoHabito, habitoCumpridoNoDia: habitoCumpridoNoDia,
+    cumprimentoNaSemana: cumprimentoNaSemana, habito: habito, habitos: habitos, salvarHabito: salvarHabito, excluirHabito: excluirHabito,
     marcarHabito: marcarHabito, habitoValeNoDia: habitoValeNoDia, progressoHabito: progressoHabito, sequenciaHabito: sequenciaHabito,
     xpDosHabitos: xpDosHabitos, diaDaSemana: diaDaSemana
   };

@@ -72,7 +72,7 @@ var Metas = (function () {
     raiz.appendChild(el('div', { class: 'pagina-topo' }, [
       el('div', null, [
         el('h1', { class: 'pagina-titulo', text: 'Metas' }),
-        el('div', { class: 'pagina-subtitulo', text: 'Cada meta concluída rende XP e aproxima a próxima patente.' })
+        el('div', { class: 'pagina-subtitulo', text: 'Metas recorrentes (por dia, semana ou mês) e metas de longo prazo. Cada uma cumprida rende XP.' })
       ]),
       el('div', { class: 'pagina-acoes' }, [
         UI.botao('Meta recorrente', function () { Habitos.editar(); }, 'btn-secundario', 'mais'),

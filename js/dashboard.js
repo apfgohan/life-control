@@ -31,25 +31,7 @@ var Dashboard = (function () {
     return Math.round(Dados.historico().filter(function (r) { return r.data >= seg && r.data <= fim; }).reduce(function (s, r) { return s + Dados.duracaoSeg(r); }, 0) / 60);
   }
   // Metas recorrentes: dias cumpridos das metas diárias + metas semanais batidas, sobre o possível até hoje.
-  function metasNaSemana(seg) {
-    var hoje = UI.hoje(), r = { feitas: 0, possiveis: 0 };
-    Dados.db.habitos.forEach(function (h) {
-      if (h.periodo === 'dia') {
-        for (var i = 0; i < 7; i++) {
-          var d = UI.somarDias(seg, i);
-          if (d > hoje || (d < h.desde && !h.feitos[d]) || !Dados.habitoValeNoDia(h, d)) continue;
-          r.possiveis++;
-          if (h.feitos[d]) r.feitas++;
-        }
-      } else if (h.periodo === 'semana') {
-        if (UI.somarDias(seg, 6) < h.desde) return;
-        r.possiveis++;
-        if (Dados.progressoHabito(h, seg).completo) r.feitas++;
-      }
-    });
-    r.pct = r.possiveis ? Math.round(r.feitas / r.possiveis * 100) : null;
-    return r;
-  }
+  function metasNaSemana(seg) { return Dados.cumprimentoNaSemana(seg); }
   function dietaNaSemana(seg) {
     var s = Dados.semanaDieta(seg);
     s.pct = s.total ? Math.round(s.dieta / s.total * 100) : null;
