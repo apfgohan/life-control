@@ -105,6 +105,7 @@ var Nuvem = (function () {
       comparado = true;
       estado = online ? 'sincronizado' : 'offline';
       notificar();
+      if (window.Fotos) Fotos.enviarPendentes();
       if (pendente) return gravarAgora();
     }).then(function () {
       ref.child('atualizadoEm').on('value', function (snap) {
@@ -137,6 +138,12 @@ var Nuvem = (function () {
     timer = setTimeout(gravarAgora, ESPERA_MS);
   }
 
+
+  // ---------- Fotos de evolução (fora dos dados principais, uma por registro) ----------
+  function podeGravar() { return !!(ref && comparado && estado !== 'negado'); }
+  function salvarFoto(id, rec) { return ref.child('fotos/' + id).set(rec); }
+  function buscarFoto(id) { return ref.child('fotos/' + id).once('value').then(function (s) { return s.val(); }); }
+  function apagarFoto(id) { return ref.child('fotos/' + id).remove(); }
 
   window.addEventListener('beforeunload', function (e) {
     if (pendente && ref) { gravarAgora(); e.preventDefault(); e.returnValue = ''; }
@@ -234,6 +241,7 @@ var Nuvem = (function () {
   return {
     iniciar: iniciar, agendar: agendar, gravarAgora: gravarAgora, entrar: entrar, sair: sair, aoMudar: aoMudar,
     regrasSugeridas: regrasSugeridas, VERSAO_SDK: VERSAO_SDK, pelaWeb: pelaWeb,
+    podeGravar: podeGravar, salvarFoto: salvarFoto, buscarFoto: buscarFoto, apagarFoto: apagarFoto,
     ativa: function () { return ativa; },
     info: function () {
       return { ativa: ativa, estado: estado, email: usuario ? usuario.email : null, uid: usuario ? usuario.uid : null,

@@ -2,7 +2,9 @@
 var App = (function () {
   var rotas = {
     inicio: Inicio.render,
+    dashboard: Dashboard.render,
     treinos: Treinos.render,
+    dieta: Dieta.render,
     treino: Treinos.renderExecucao,
     lembretes: Lembretes.render,
     metas: Metas.render,

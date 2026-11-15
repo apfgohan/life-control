@@ -26,6 +26,15 @@ var Dados = (function () {
       // tipo 'dia': data (+hora); 'prazo': de inicio até fim; 'aberto': até concluir.
       lembretes: [],    // { id, titulo, detalhe, tipo, data, hora, inicio, fim, relevancia, concluido, dataConclusao, criadoEm }
       metas: [],        // { id, area, titulo, descricao, dificuldade, prazo, concluida, dataConclusao, criadoEm }
+      // Plano alimentar: refeições com os alimentos (quantidade e substituição; comer a substituição também é seguir a dieta).
+      // desde: a partir de quando as refeições não registradas tiram pontos. refeicao.desde: quando ela entrou no plano.
+      // soTreino: a refeição só conta nos dias com treino (ex.: pós-treino). frutas: tabela de porções equivalentes.
+      dieta: { desde: null, refeicoes: [], frutas: [], orientacoes: '' },
+      // refeicoes: [{ id, nome, horario, ordem, desde, soTreino, obs, itens: [{ alimento, quantidade, substituicao }] }]
+      // Registro das refeições por dia: 'AAAA-MM-DD' -> { refeicaoId: { tipo: 'dieta'|'outro', opcaoId, descricao, em } }
+      alimentacao: {},
+      // Registro semanal (domingo): peso em jejum e medidas em cm. As fotos ficam à parte (js/fotos.js), aqui só os ids.
+      medidas: [],      // { id, data, peso, braco, coxa, panturrilha, obs, fotos: { frente, lateral, costas }, criadoEm }
       configurado: false // vira true quando o perfil é alterado (dados "não vazios" para a sincronização)
     };
   }
@@ -38,7 +47,14 @@ var Dados = (function () {
   function normalizar(d) {
     var v = vazio();
     if (!d || typeof d !== 'object') return v;
-    ['treinos', 'registros', 'lembretes', 'metas', 'habitos'].forEach(function (k) { if (!Array.isArray(d[k])) d[k] = []; });
+    ['treinos', 'registros', 'lembretes', 'metas', 'habitos', 'medidas'].forEach(function (k) { if (!Array.isArray(d[k])) d[k] = []; });
+    if (!d.dieta || typeof d.dieta !== 'object') d.dieta = { desde: null, refeicoes: [] };
+    if (!Array.isArray(d.dieta.refeicoes)) d.dieta.refeicoes = [];
+    if (!Array.isArray(d.dieta.frutas)) d.dieta.frutas = [];
+    if (typeof d.dieta.orientacoes !== 'string') d.dieta.orientacoes = '';
+    d.dieta.refeicoes.forEach(function (r) { if (!Array.isArray(r.itens)) r.itens = []; });
+    if (!d.alimentacao || typeof d.alimentacao !== 'object') d.alimentacao = {};
+    d.medidas.forEach(function (m) { if (!m.fotos || typeof m.fotos !== 'object') m.fotos = {}; });
     d.habitos.forEach(function (h) { if (!h.feitos || typeof h.feitos !== 'object') h.feitos = {}; if (!Array.isArray(h.dias)) h.dias = []; });
     d.treinos.forEach(function (t) {
       if (!Array.isArray(t.exercicios)) t.exercicios = [];
@@ -106,7 +122,8 @@ var Dados = (function () {
   function semDados(d) {
     d = d || db;
     if (!d) return true;
-    return !d.configurado && !['treinos', 'registros', 'lembretes', 'metas', 'habitos', 'lancamentos'].some(function (k) { return Array.isArray(d[k]) && d[k].length; });
+    return !d.configurado && !['treinos', 'registros', 'lembretes', 'metas', 'habitos', 'medidas', 'lancamentos'].some(function (k) { return Array.isArray(d[k]) && d[k].length; })
+      && !(d.dieta && Array.isArray(d.dieta.refeicoes) && d.dieta.refeicoes.length);
   }
 
   function novoId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -244,7 +261,7 @@ var Dados = (function () {
   // Treinos já finalizados, do mais recente para o mais antigo (opcional: só os de um treino).
   function historico(treinoId) {
     return db.registros.filter(function (r) { return r.fim && (!treinoId || r.treinoId === treinoId); })
-      .sort(function (a, b) { return (b.inicio || 0) - (a.inicio || 0); });
+      .sort(function (a, b) { return a.data !== b.data ? (a.data < b.data ? 1 : -1) : (b.inicio || 0) - (a.inicio || 0); });
   }
   function iniciarTreino(treinoId) {
     var atual = treinoEmAndamento();
@@ -309,6 +326,151 @@ var Dados = (function () {
       if (x.data === hoje) r.hoje += v;
     });
     return r;
+  }
+
+  // ---------- Dieta ----------
+  var XP_DIETA = { refeicao: 10, perdida: -15, medidas: 30 };
+  function refeicoes() { return db.dieta.refeicoes.slice().sort(porOrdem); }
+  function moverRefeicao(id, delta) { mover(db.dieta.refeicoes, refeicao(id), delta); salvar(); }
+  function refeicao(id) { return buscar(db.dieta.refeicoes, id); }
+  // Próxima segunda-feira (a semana vai de segunda a domingo).
+  function proximaSegunda(iso) { var d = diaDaSemana(iso); return UI.somarDias(iso, d === 0 ? 7 : 7 - d); }
+  function inicioDaDieta() { return db.dieta.desde; }
+  function definirInicioDaDieta(iso) { db.dieta.desde = iso || null; salvar(); }
+  function limparItens(lista) {
+    return (lista || []).map(function (i) { return { alimento: texto(i.alimento), quantidade: texto(i.quantidade), substituicao: texto(i.substituicao) }; })
+      .filter(function (i) { return i.alimento; });
+  }
+  function salvarRefeicao(campos, id) {
+    var r = id ? refeicao(id) : null;
+    if (!r) {
+      r = { id: novoId(), ordem: proximaOrdem(db.dieta.refeicoes), desde: UI.hoje(), itens: [] };
+      db.dieta.refeicoes.push(r);
+      if (!db.dieta.desde) db.dieta.desde = proximaSegunda(UI.hoje());
+    }
+    r.nome = texto(campos.nome) || 'Refeição';
+    r.horario = /^\d{2}:\d{2}$/.test(campos.horario || '') ? campos.horario : '';
+    r.soTreino = !!campos.soTreino;
+    r.obs = texto(campos.obs);
+    r.itens = limparItens(campos.itens);
+    salvar();
+    return r;
+  }
+  function excluirRefeicao(id) { db.dieta.refeicoes = db.dieta.refeicoes.filter(function (r) { return r.id !== id; }); salvar(); }
+  // Importa um plano alimentar (arquivo .json): substitui as refeições, a tabela de frutas e as orientações.
+  // As refeições passam a contar a partir de `desde` (padrão: próxima segunda-feira). Os registros antigos ficam.
+  function importarPlano(plano, desde) {
+    if (!plano || !Array.isArray(plano.refeicoes) || !plano.refeicoes.length) throw new Error('O arquivo não tem as refeições do plano.');
+    var inicio = desde || proximaSegunda(UI.hoje());
+    // As refeições já aparecem hoje (para registrar); só tiram pontos a partir do início do acompanhamento.
+    var aparece = inicio < UI.hoje() ? inicio : UI.hoje();
+    db.dieta.refeicoes = plano.refeicoes.map(function (r, i) {
+      return { id: novoId(), ordem: i + 1, desde: aparece, nome: texto(r.nome) || 'Refeição ' + (i + 1), horario: /^\d{2}:\d{2}$/.test(r.horario || '') ? r.horario : '',
+        soTreino: !!r.soTreino, obs: texto(r.obs), itens: limparItens(r.itens) };
+    });
+    db.dieta.frutas = (plano.frutas || []).map(function (f) { return { fruta: texto(f.fruta), peso: texto(f.peso), quantidade: texto(f.quantidade) }; }).filter(function (f) { return f.fruta; });
+    db.dieta.orientacoes = texto(plano.orientacoes);
+    db.dieta.desde = inicio;
+    salvar();
+  }
+  // Houve treino neste dia (finalizado, ou em andamento hoje)?
+  function treinouNoDia(iso) { return db.registros.some(function (r) { return r.data === iso; }); }
+  // Refeições que contam num dia: as do plano que já existiam naquele dia (as "só em dia de treino", só se treinou).
+  function refeicoesDoDia(iso) {
+    var treinou = null;
+    return refeicoes().filter(function (r) {
+      if (r.desde && r.desde > iso) return false;
+      if (!r.soTreino) return true;
+      if (treinou === null) treinou = treinouNoDia(iso);
+      return treinou || !!registroRefeicao(iso, r.id);
+    });
+  }
+  function registroRefeicao(iso, refId) { var d = db.alimentacao[iso]; return d ? d[refId] || null : null; }
+  function registrarRefeicao(iso, refId, campos) {
+    var d = db.alimentacao[iso] || (db.alimentacao[iso] = {});
+    d[refId] = { tipo: campos.tipo === 'outro' ? 'outro' : 'dieta', descricao: texto(campos.descricao), em: Date.now() };
+    salvar();
+  }
+  function desfazerRefeicao(iso, refId) {
+    var d = db.alimentacao[iso];
+    if (!d) return;
+    delete d[refId];
+    if (!Object.keys(d).length) delete db.alimentacao[iso];
+    salvar();
+  }
+  // Situação de um dia: refeições na dieta, trocadas, não registradas e os pontos.
+  // Hoje (e dias futuros) não perdem pontos: a refeição ainda pode ser registrada.
+  function resumoDieta(iso, hoje) {
+    hoje = hoje || UI.hoje();
+    var lista = refeicoesDoDia(iso), r = { total: lista.length, dieta: 0, outro: 0, faltam: 0, xp: 0 };
+    var conta = db.dieta.desde && iso >= db.dieta.desde && iso < hoje;
+    lista.forEach(function (ref) {
+      var x = registroRefeicao(iso, ref.id);
+      if (x && x.tipo === 'dieta') { r.dieta++; r.xp += XP_DIETA.refeicao; }
+      else if (x) r.outro++;
+      else { r.faltam++; if (conta) r.xp += XP_DIETA.perdida; }
+    });
+    // Registros de refeições que saíram do plano ainda contam como seguidos, se foram na dieta.
+    Object.keys(db.alimentacao[iso] || {}).forEach(function (id) {
+      if (!lista.some(function (ref) { return ref.id === id; }) && db.alimentacao[iso][id].tipo === 'dieta') r.xp += XP_DIETA.refeicao;
+    });
+    r.perdeu = conta && r.faltam > 0;
+    return r;
+  }
+  // Pontos da dieta: refeições seguidas, refeições não registradas (dias já encerrados) e o registro semanal.
+  function xpDaDieta(hoje) {
+    var r = { xp: 0, hoje: 0, seguidas: 0, perdidas: 0, medidas: db.medidas.length };
+    var dias = {};
+    Object.keys(db.alimentacao).forEach(function (d) { dias[d] = 1; });
+    if (db.dieta.desde && db.dieta.refeicoes.length) {
+      for (var d = db.dieta.desde, i = 0; d < hoje && i < 3660; d = UI.somarDias(d, 1), i++) dias[d] = 1;
+    }
+    Object.keys(dias).forEach(function (d) {
+      var s = resumoDieta(d, hoje);
+      r.xp += s.xp; r.seguidas += s.dieta;
+      if (s.perdeu) r.perdidas += s.faltam;
+      if (d === hoje) r.hoje += s.xp;
+    });
+    db.medidas.forEach(function (m) { r.xp += XP_DIETA.medidas; if (m.data === hoje) r.hoje += XP_DIETA.medidas; });
+    return r;
+  }
+  // Adesão de uma semana (segunda a domingo) que contém o dia.
+  function semanaDieta(iso) {
+    var ini = UI.somarDias(iso, -diaDaSemana(iso)), r = { inicio: ini, fim: UI.somarDias(ini, 6), total: 0, dieta: 0, outro: 0, faltam: 0 };
+    for (var i = 0; i < 7; i++) {
+      var d = UI.somarDias(ini, i);
+      if (d > UI.hoje()) break;
+      var s = resumoDieta(d);
+      r.total += s.total; r.dieta += s.dieta; r.outro += s.outro; r.faltam += s.faltam;
+    }
+    return r;
+  }
+
+  // ---------- Medidas semanais ----------
+  function medida(id) { return buscar(db.medidas, id); }
+  function medidas() { return db.medidas.slice().sort(function (a, b) { return a.data < b.data ? 1 : a.data > b.data ? -1 : 0; }); }
+  function medidaDoDia(iso) { return db.medidas.filter(function (m) { return m.data === iso; })[0] || null; }
+  function salvarMedida(campos, id) {
+    var m = id ? medida(id) : medidaDoDia(campos.data);
+    if (!m) { m = { id: novoId(), criadoEm: Date.now(), fotos: {} }; db.medidas.push(m); }
+    m.data = campos.data || UI.hoje();
+    ['peso', 'braco', 'coxa', 'panturrilha'].forEach(function (k) { var v = numero(campos[k], 0, 500, NaN); m[k] = isFinite(v) && v > 0 ? v : null; });
+    m.obs = texto(campos.obs);
+    if (campos.fotos) Object.keys(campos.fotos).forEach(function (k) { if (campos.fotos[k] !== undefined) m.fotos[k] = campos.fotos[k] || null; });
+    salvar();
+    return m;
+  }
+  function excluirMedida(id) { db.medidas = db.medidas.filter(function (m) { return m.id !== id; }); salvar(); }
+  // Domingo do registro semanal: hoje, se for domingo; senão, o último domingo.
+  function domingoDaSemana(iso) { var d = diaDaSemana(iso); return d === 6 ? iso : UI.somarDias(iso, -(d + 1)); }
+  // O registro do domingo mais recente está pendente? (Só depois que há plano alimentar ou algum registro.)
+  function medidaPendente(hoje) {
+    hoje = hoje || UI.hoje();
+    var dom = domingoDaSemana(hoje);
+    if (medidaDoDia(dom)) return null;
+    // Vale também registrar na segunda de manhã o domingo que passou; depois disso, espera o próximo domingo.
+    if (dom !== hoje && UI.diasEntre(dom, hoje) > 1) return null;
+    return dom;
   }
 
   // ---------- Lembretes ----------
@@ -474,6 +636,13 @@ var Dados = (function () {
     registro: registro, treinoEmAndamento: treinoEmAndamento, historico: historico, iniciarTreino: iniciarTreino, feitoNoRegistro: feitoNoRegistro,
     concluirExercicio: concluirExercicio, desfazerExercicio: desfazerExercicio, finalizarTreino: finalizarTreino, cancelarTreino: cancelarTreino,
     excluirRegistro: excluirRegistro, duracaoSeg: duracaoSeg, ultimoResultado: ultimoResultado, XP_TREINO: XP_TREINO, xpDoRegistro: xpDoRegistro, xpDosTreinos: xpDosTreinos,
+    XP_DIETA: XP_DIETA, refeicoes: refeicoes, refeicao: refeicao, salvarRefeicao: salvarRefeicao, excluirRefeicao: excluirRefeicao,
+    moverRefeicao: moverRefeicao, importarPlano: importarPlano, treinouNoDia: treinouNoDia,
+    refeicoesDoDia: refeicoesDoDia, registroRefeicao: registroRefeicao, registrarRefeicao: registrarRefeicao, desfazerRefeicao: desfazerRefeicao,
+    resumoDieta: resumoDieta, xpDaDieta: xpDaDieta, semanaDieta: semanaDieta, inicioDaDieta: inicioDaDieta, definirInicioDaDieta: definirInicioDaDieta,
+    proximaSegunda: proximaSegunda,
+    medida: medida, medidas: medidas, medidaDoDia: medidaDoDia, salvarMedida: salvarMedida, excluirMedida: excluirMedida,
+    domingoDaSemana: domingoDaSemana, medidaPendente: medidaPendente,
     lembrete: lembrete, salvarLembrete: salvarLembrete, concluirLembrete: concluirLembrete, excluirLembrete: excluirLembrete,
     dataLimite: dataLimite, situacaoLembrete: situacaoLembrete, lembretesAtivos: lembretesAtivos, ordemLembrete: ordemLembrete,
     AREAS: AREAS, DIFICULDADES: DIFICULDADES, meta: meta, salvarMeta: salvarMeta, concluirMeta: concluirMeta, excluirMeta: excluirMeta, xpDaMeta: xpDaMeta,

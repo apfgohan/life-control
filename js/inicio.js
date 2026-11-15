@@ -31,7 +31,10 @@ var Inicio = (function () {
   function render(raiz) {
     raiz.appendChild(saudacao());
     raiz.appendChild(painelAvisos());
+    var semanal = Dieta.painelPendente();
+    if (semanal) raiz.appendChild(semanal);
     raiz.appendChild(Treinos.painelInicio());
+    raiz.appendChild(Dieta.painelDia(UI.hoje(), { titulo: 'Alimentação de hoje' }));
     raiz.appendChild(Habitos.painelHoje());
   }
 

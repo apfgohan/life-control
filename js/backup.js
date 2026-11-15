@@ -10,15 +10,30 @@ var Backup = (function () {
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
 
+  // O arquivo leva também as fotos de evolução (guardadas à parte), no campo "fotos".
+  function exportar() {
+    var ids = [];
+    Dados.db.medidas.forEach(function (m) { Object.keys(m.fotos || {}).forEach(function (k) { if (m.fotos[k]) ids.push(m.fotos[k]); }); });
+    Fotos.exportarTodas(ids).then(function (fotos) {
+      var dados = JSON.parse(Dados.exportar());
+      dados.fotos = fotos;
+      baixar(JSON.stringify(dados, null, 2));
+    });
+  }
+
   function importar(arquivo) {
     if (!arquivo) return;
     var leitor = new FileReader();
     leitor.onload = function () {
       UI.confirmar('Importar "' + arquivo.name + '"? Os dados atuais serão substituídos pelos do arquivo.', function () {
         try {
-          Dados.importar(leitor.result);
-          UI.aviso('Backup importado');
-          App.atualizar();
+          var dados = JSON.parse(leitor.result), fotos = dados && Array.isArray(dados.fotos) ? dados.fotos : null;
+          if (dados) delete dados.fotos; // as fotos não entram nos dados principais
+          Dados.importar(JSON.stringify(dados));
+          (fotos ? Fotos.importarTodas(fotos) : Promise.resolve()).then(function () {
+            UI.aviso('Backup importado' + (fotos ? ', com ' + fotos.length + ' fotos' : ''));
+            App.atualizar();
+          });
         } catch (e) { alert('Não foi possível importar: ' + e.message); }
       }, 'Importar');
     };
@@ -41,8 +56,8 @@ var Backup = (function () {
     raiz.appendChild(el('section', { class: 'painel grade-backup' }, [
       el('div', { class: 'opcao-backup' }, [
         el('h2', { class: 'secao-titulo', text: 'Exportar' }),
-        el('p', { text: 'Baixa um arquivo .json com tudo: ' + db.treinos.length + ' treinos, ' + db.registros.length + ' treinos feitos, ' + db.habitos.length + ' metas recorrentes, ' + db.metas.length + ' metas de longo prazo e ' + db.lembretes.length + ' lembretes.' + (Array.isArray(db.lancamentos) && db.lancamentos.length ? ' Leva também os dados antigos do financeiro.' : '') }),
-        UI.botao('Exportar backup', function () { baixar(Dados.exportar()); }, 'btn-primario')
+        el('p', { text: 'Baixa um arquivo .json com tudo: ' + db.treinos.length + ' treinos, ' + db.registros.length + ' treinos feitos, ' + db.habitos.length + ' metas recorrentes, ' + db.metas.length + ' metas de longo prazo, ' + db.lembretes.length + ' lembretes, o plano alimentar e ' + db.medidas.length + ' registros semanais com as fotos.' + (Array.isArray(db.lancamentos) && db.lancamentos.length ? ' Leva também os dados antigos do financeiro.' : '') }),
+        UI.botao('Exportar backup', exportar, 'btn-primario')
       ]),
       el('div', { class: 'opcao-backup' }, [
         el('h2', { class: 'secao-titulo', text: 'Importar' }),
