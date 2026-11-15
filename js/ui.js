@@ -128,6 +128,30 @@ var UI = (function () {
     if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
     return t === '' ? NaN : parseFloat(t);
   }
+  // Tempo de descanso: lê "45s", "45", "2m", "2 min", "1:30", "1m30s" em segundos (NaN se não der; '' = 0).
+  function lerTempo(texto) {
+    var t = String(texto == null ? '' : texto).toLowerCase().replace(/\s+/g, '').replace(',', '.');
+    if (!t) return 0;
+    var m = t.match(/^(\d+):(\d{1,2})$/);
+    if (m) return Number(m[1]) * 60 + Number(m[2]);
+    m = t.match(/^(?:(\d+(?:\.\d+)?)m(?:in)?)?(?:(\d+)s(?:eg)?)?$/);
+    if (m && (m[1] || m[2])) return Math.round(Number(m[1] || 0) * 60) + Number(m[2] || 0);
+    m = t.match(/^\d+$/);
+    return m ? Number(t) : NaN;
+  }
+  // "45 s", "2 min", "1 min 30 s"
+  function fmtTempo(seg) {
+    seg = Math.round(seg || 0);
+    var m = Math.floor(seg / 60), s = seg % 60;
+    return m ? m + ' min' + (s ? ' ' + s + ' s' : '') : s + ' s';
+  }
+  // Para o campo de texto: "45s", "2m", "1m30s"
+  function campoTempo(seg) {
+    seg = Math.round(seg || 0);
+    if (!seg) return '';
+    var m = Math.floor(seg / 60), s = seg % 60;
+    return (m ? m + 'm' : '') + (s ? s + 's' : '');
+  }
   function campoValor(v) { return v ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; }
   var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   function nomeMes(mes) { var p = mes.split('-'); return MESES[Number(p[1]) - 1] + ' de ' + p[0]; }
@@ -279,6 +303,7 @@ var UI = (function () {
     el: el, icone: icone,
     hoje: hoje, somarDias: somarDias, diasEntre: diasEntre, fmtData: fmtData, haQuanto: haQuanto,
     fmtPct: fmtPct, fmtNum: fmtNum, fmtDuracao: fmtDuracao, pad: pad,
+    lerTempo: lerTempo, fmtTempo: fmtTempo, campoTempo: campoTempo,
     fmtMoeda: fmtMoeda, fmtCurto: fmtCurto, lerValor: lerValor, campoValor: campoValor,
     MESES: MESES, nomeMes: nomeMes, somarMeses: somarMeses, fmtDiaMes: fmtDiaMes,
     barra: barra, cartao: cartao, selo: selo, botao: botao, botaoEngrenagem: botaoEngrenagem, metrica: metrica,

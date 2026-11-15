@@ -14,7 +14,8 @@ var Dados = (function () {
       perfil: { nome: '', foto: null },   // foto: imagem enviada, em data URL
       // Treinos cadastrados. Musculação: exercícios com séries em % da carga principal (a série de 100%).
       treinos: [],      // { id, nome, tipo: 'musculacao'|'corrida', ordem, arquivado, criadoEm,
-                        //   exercicios: [{ id, nome, carga, descanso (min), obs, series: [{ rotulo, pct, reps }] }] }
+                        //   exercicios: [{ id, nome, equipamento: 'maquina'|'livre', carga, obs,
+                        //                  series: [{ rotulo, pct, reps, descanso (segundos depois desta série) }] }] }
       // Treinos feitos. fim null = treino em andamento (continua em qualquer aparelho).
       registros: [],    // { id, treinoId, nomeTreino, tipo, data, inicio, fim, exercicios: [{ exercicioId, nome, carga, reps, concluidoEm }],
                         //   corrida: { km }, obs }
@@ -29,6 +30,7 @@ var Dados = (function () {
     };
   }
 
+  var ROTULO_ANTIGO = { normal: 'preparacao', falha: 'valida' };
   // Áreas antigas das metas (do tempo do financeiro) passam para as novas.
   var AREA_ANTIGA = { financeiro: 'habitos', fisico: 'treino', geral: 'habitos' };
 
@@ -40,7 +42,17 @@ var Dados = (function () {
     d.habitos.forEach(function (h) { if (!h.feitos || typeof h.feitos !== 'object') h.feitos = {}; if (!Array.isArray(h.dias)) h.dias = []; });
     d.treinos.forEach(function (t) {
       if (!Array.isArray(t.exercicios)) t.exercicios = [];
-      t.exercicios.forEach(function (e) { if (!Array.isArray(e.series)) e.series = []; });
+      t.exercicios.forEach(function (e) {
+        if (!Array.isArray(e.series)) e.series = [];
+        if (!e.equipamento) e.equipamento = 'livre';
+        // Versão anterior: um descanso só por exercício (em minutos) e séries "normal" / "falha".
+        var antigo = typeof e.descanso === 'number' ? Math.round(e.descanso * 60) : 0;
+        e.series.forEach(function (s, i) {
+          if (ROTULO_ANTIGO[s.rotulo]) s.rotulo = ROTULO_ANTIGO[s.rotulo];
+          if (typeof s.descanso !== 'number') s.descanso = i < e.series.length - 1 ? antigo : 0;
+        });
+        delete e.descanso;
+      });
     });
     d.registros.forEach(function (r) { if (!Array.isArray(r.exercicios)) r.exercicios = []; });
     d.metas.forEach(function (m) { if (AREA_ANTIGA[m.area]) m.area = AREA_ANTIGA[m.area]; });
@@ -122,9 +134,11 @@ var Dados = (function () {
 
   // ---------- Treinos (cadastro) ----------
   var TIPOS_TREINO = [['musculacao', 'Musculação'], ['corrida', 'Corrida']];
-  var ROTULOS_SERIE = [['aquecimento', 'Aquecimento'], ['normal', 'Série'], ['falha', 'Até a falha']];
-  // Três séries padrão: aquecimento a 50%, 75% e a principal (100%) até a falha.
-  var SERIES_PADRAO = [{ rotulo: 'aquecimento', pct: 50, reps: '' }, { rotulo: 'normal', pct: 75, reps: '' }, { rotulo: 'falha', pct: 100, reps: '' }];
+  var ROTULOS_SERIE = [['aquecimento', 'Aquecimento'], ['preparacao', 'Preparação'], ['valida', 'Válida']];
+  var EQUIPAMENTOS = [['livre', 'Peso livre'], ['maquina', 'Máquina']];
+  var PASSO_MAQUINA = 5; // nas máquinas o peso sobe de 5 em 5 kg
+  // Três séries padrão: aquecimento a 50% (45 s de descanso), preparação a 75% (2 min) e a válida (100%) até a falha.
+  var SERIES_PADRAO = [{ rotulo: 'aquecimento', pct: 50, reps: '', descanso: 45 }, { rotulo: 'preparacao', pct: 75, reps: '', descanso: 120 }, { rotulo: 'valida', pct: 100, reps: '', descanso: 0 }];
 
   function treino(id) { return buscar(db.treinos, id); }
   function treinos(comArquivados) { return db.treinos.filter(function (t) { return comArquivados || !t.arquivado; }).sort(porOrdem); }
@@ -160,11 +174,14 @@ var Dados = (function () {
     var t = treino(treinoId), e = exId ? buscar(t.exercicios, exId) : null;
     if (!e) { e = { id: novoId(), ordem: proximaOrdem(t.exercicios) }; t.exercicios.push(e); }
     e.nome = texto(campos.nome) || 'Exercício';
+    e.equipamento = campos.equipamento === 'maquina' ? 'maquina' : 'livre';
     e.carga = numero(campos.carga, 0, 1000, 0);
-    e.descanso = numero(campos.descanso, 0, 30, 0);
+    delete e.descanso;
     e.obs = texto(campos.obs);
     var series = (campos.series || []).map(function (s) {
-      return { rotulo: ROTULOS_SERIE.some(function (r) { return r[0] === s.rotulo; }) ? s.rotulo : 'normal', pct: numero(s.pct, 0, 200, 100), reps: texto(s.reps) };
+      var d = Number(s.descanso);
+      return { rotulo: ROTULOS_SERIE.some(function (r) { return r[0] === s.rotulo; }) ? s.rotulo : 'preparacao', pct: numero(s.pct, 0, 200, 100), reps: texto(s.reps),
+        descanso: isFinite(d) ? Math.max(0, Math.min(3600, Math.round(d))) : 0 };
     });
     e.series = series.length ? series : SERIES_PADRAO.map(function (s) { return Object.assign({}, s); });
     salvar();
@@ -177,8 +194,13 @@ var Dados = (function () {
   }
   function moverExercicio(treinoId, exId, delta) { var t = treino(treinoId); mover(t.exercicios, buscar(t.exercicios, exId), delta); salvar(); }
 
-  // Carga de uma série: % da carga principal, arredondada para múltiplos de 1 kg.
-  function cargaDaSerie(carga, serie) { return Math.round((Number(carga) || 0) * (Number(serie.pct) || 0) / 100); }
+  // Carga de uma série: % da carga principal. Peso livre: arredondada para o kg mais próximo.
+  // Máquina: arredondada para baixo, para o múltiplo de 5 kg (85 kg a 50% = 42,5 → 40 kg).
+  function cargaDaSerie(carga, serie, equipamento) {
+    var v = (Number(carga) || 0) * (Number(serie.pct) || 0) / 100;
+    if (equipamento === 'maquina') return Math.floor(v / PASSO_MAQUINA + 1e-9) * PASSO_MAQUINA;
+    return Math.round(v);
+  }
 
   // ---------- Registro dos treinos ----------
   function registro(id) { return buscar(db.registros, id); }
@@ -408,7 +430,7 @@ var Dados = (function () {
     get db() { return db; },
     salvar: salvar, substituir: substituir, exportar: exportar, importar: importar, limpar: limpar, semDados: semDados, ehDoPrograma: ehDoPrograma,
     atualizarPerfil: atualizarPerfil,
-    TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, SERIES_PADRAO: SERIES_PADRAO,
+    TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, SERIES_PADRAO: SERIES_PADRAO, EQUIPAMENTOS: EQUIPAMENTOS, PASSO_MAQUINA: PASSO_MAQUINA,
     treino: treino, treinos: treinos, salvarTreino: salvarTreino, excluirTreino: excluirTreino, moverTreino: moverTreino,
     exercicio: exercicio, exercicios: exercicios, salvarExercicio: salvarExercicio, excluirExercicio: excluirExercicio, moverExercicio: moverExercicio,
     cargaDaSerie: cargaDaSerie,

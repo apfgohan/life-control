@@ -532,6 +532,12 @@ h1, h2, p { margin: 0; }
 .serie-numero { font-weight: 800; color: var(--texto-3); text-align: center; }
 .serie-pct { display: flex; align-items: center; gap: 4px; font-weight: 700; color: var(--texto-2); }
 .serie-previa { font-size: 13px; font-weight: 800; white-space: nowrap; }
+.descanso-editor { display: flex; align-items: center; gap: 8px; margin: -2px 0 4px 28px; font-size: 12px; font-weight: 700; color: var(--texto-3); }
+.descanso-editor .icone { width: 14px; height: 14px; }
+.descanso-editor input { width: 96px; padding: 5px 8px; border: 1px dashed var(--borda-forte); border-radius: 8px; background: transparent; font-size: 13px; }
+.descanso-editor input.invalido { border-color: var(--vermelho); color: var(--vermelho); }
+.descanso-linha { display: flex; align-items: center; gap: 6px; padding: 0 0 0 16px; font-size: 13px; font-weight: 700; color: var(--teal); }
+.descanso-linha .icone { width: 15px; height: 15px; }
 
 /* ---------- Treino em andamento ---------- */
 .cronometro { font-variant-numeric: tabular-nums; font-weight: 800; }
@@ -579,7 +585,7 @@ h1, h2, p { margin: 0; }
 .serie-tipo small { font-size: 12px; font-weight: 600; color: var(--texto-3); }
 .serie-carga { font-size: 22px; font-weight: 800; white-space: nowrap; }
 .serie-linha.rot-aquecimento { border-left: 4px solid var(--teal); }
-.serie-linha.rot-falha { border-left: 4px solid var(--vermelho); background: var(--vermelho-claro); border-color: var(--vermelho-borda); border-left-color: var(--vermelho); }
+.serie-linha.rot-valida { border-left: 4px solid var(--vermelho); background: var(--vermelho-claro); border-color: var(--vermelho-borda); border-left-color: var(--vermelho); }
 .registrar-serie { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--borda); }
 .registrar-serie input { font-size: 20px; font-weight: 800; text-align: center; }
 .registrar-serie .btn-grande { width: 100%; }

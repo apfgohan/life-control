@@ -16,7 +16,13 @@ var Treinos = (function () {
   }
   function textoUltimo(u) { return u ? kg(u.carga) + ' × ' + u.reps + ' · ' + UI.fmtDiaMes(u.data) : 'Primeira vez'; }
   function resumoSeries(e) {
-    return e.series.map(function (s) { return s.pct + '% ' + kg(Dados.cargaDaSerie(e.carga, s)); }).join(' · ');
+    return e.series.map(function (s) { return s.pct + '% ' + kg(Dados.cargaDaSerie(e.carga, s, e.equipamento)); }).join(' · ');
+  }
+  function nomeEquip(e) { return e.equipamento === 'maquina' ? 'Máquina' : 'Peso livre'; }
+  // "3 séries · Máquina · descansos 45 s / 2 min"
+  function metaExercicio(e) {
+    var d = e.series.map(function (s) { return s.descanso || 0; }).filter(function (x, i) { return x && i < e.series.length - 1; });
+    return e.series.length + (e.series.length === 1 ? ' série' : ' séries') + ' · ' + nomeEquip(e) + (d.length ? ' · descanso ' + d.map(UI.fmtTempo).join(' / ') : '');
   }
 
   // Cronômetro: qualquer elemento com data-desde (timestamp) mostra o tempo decorrido, atualizado a cada segundo.
@@ -146,20 +152,43 @@ var Treinos = (function () {
   function editarExercicio(treinoId, exId) {
     var e = exId ? Dados.exercicio(treinoId, exId) : null;
     var nome = el('input', { type: 'text', value: e ? e.nome : '', placeholder: 'Ex.: T-Bar Row', maxLength: 60 });
+    var equipamento = (e && e.equipamento) || 'livre';
+    var botoesEquip = Dados.EQUIPAMENTOS.map(function (x) {
+      return el('button', { type: 'button', class: equipamento === x[0] ? 'ativo' : '', text: x[1], onclick: function () {
+        equipamento = x[0];
+        botoesEquip.forEach(function (b, i) { b.classList.toggle('ativo', Dados.EQUIPAMENTOS[i][0] === equipamento); });
+        ajudaEquip.textContent = textoEquip();
+        desenhar();
+      } });
+    });
+    function textoEquip() { return equipamento === 'maquina' ? 'Cargas arredondadas para baixo, de ' + Dados.PASSO_MAQUINA + ' em ' + Dados.PASSO_MAQUINA + ' kg (85 kg a 50% = 40 kg).' : 'Cargas arredondadas para o kg mais próximo.'; }
+    var ajudaEquip = el('span', { class: 'campo-ajuda', text: textoEquip() });
     var carga = el('input', { type: 'text', inputMode: 'decimal', value: e && e.carga ? String(e.carga).replace('.', ',') : '', placeholder: 'Ex.: 80' });
-    var descanso = el('input', { type: 'text', inputMode: 'decimal', value: e && e.descanso ? String(e.descanso).replace('.', ',') : '2', placeholder: '2' });
     var obs = el('input', { type: 'text', value: e ? e.obs : '', placeholder: 'Ex.: pegada fechada, banco 30° (opcional)', maxLength: 120 });
     var series = (e ? e.series : Dados.SERIES_PADRAO).map(function (s) { return Object.assign({}, s); });
     var caixa = el('div', { class: 'editor-series' });
 
     function cargaAtual() { var v = UI.lerValor(carga.value); return v > 0 ? v : 0; }
+    function campoDescanso(s, ultima) {
+      var inp = el('input', { type: 'text', value: UI.campoTempo(s.descanso), placeholder: ultima ? 'opcional' : 'ex.: 45s', maxLength: 10 });
+      inp.addEventListener('input', function () {
+        var v = UI.lerTempo(inp.value);
+        inp.classList.toggle('invalido', isNaN(v));
+        if (!isNaN(v)) s.descanso = v;
+      });
+      return el('label', { class: 'descanso-editor' + (ultima ? ' ultima' : '') }, [
+        UI.icone('relogio'),
+        el('span', { text: ultima ? 'Descanso antes do próximo exercício' : 'Descanso' }),
+        inp
+      ]);
+    }
     function desenhar() {
       caixa.innerHTML = '';
       series.forEach(function (s, i) {
         var rot = el('select', { onchange: function () { s.rotulo = rot.value; } }, Dados.ROTULOS_SERIE.map(function (r) { return el('option', { value: r[0], text: r[1], selected: s.rotulo === r[0] }); }));
-        var pct = el('input', { type: 'number', min: 0, max: 200, step: 5, value: s.pct, oninput: function () { s.pct = Number(pct.value) || 0; previa.textContent = kg(Dados.cargaDaSerie(cargaAtual(), s)); } });
+        var pct = el('input', { type: 'number', min: 0, max: 200, step: 5, value: s.pct, oninput: function () { s.pct = Number(pct.value) || 0; previa.textContent = kg(Dados.cargaDaSerie(cargaAtual(), s, equipamento)); } });
         var reps = el('input', { type: 'text', value: s.reps, placeholder: 'reps', maxLength: 12, oninput: function () { s.reps = reps.value; } });
-        var previa = el('span', { class: 'serie-previa', text: kg(Dados.cargaDaSerie(cargaAtual(), s)) });
+        var previa = el('span', { class: 'serie-previa', text: kg(Dados.cargaDaSerie(cargaAtual(), s, equipamento)) });
         caixa.appendChild(el('div', { class: 'serie-editor' }, [
           el('span', { class: 'serie-numero', text: i + 1 }),
           rot,
@@ -168,6 +197,7 @@ var Treinos = (function () {
           reps,
           el('button', { type: 'button', class: 'btn-icone', title: 'Tirar série', onclick: function () { series.splice(i, 1); desenhar(); } }, UI.icone('lixo'))
         ]));
+        caixa.appendChild(campoDescanso(s, i === series.length - 1));
       });
     }
     carga.addEventListener('input', desenhar);
@@ -176,7 +206,8 @@ var Treinos = (function () {
     var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
       if (!nome.value.trim()) { nome.focus(); return false; }
       if (!series.length) { UI.aviso('Coloque pelo menos uma série.'); return false; }
-      Dados.salvarExercicio(treinoId, { nome: nome.value, carga: carga.value, descanso: descanso.value, obs: obs.value, series: series }, exId);
+      if (caixa.querySelector('.invalido')) { UI.aviso('Descanso inválido. Use, por exemplo, 45s, 2m ou 1m30s.'); caixa.querySelector('.invalido').focus(); return false; }
+      Dados.salvarExercicio(treinoId, { nome: nome.value, equipamento: equipamento, carga: carga.value, obs: obs.value, series: series }, exId);
       App.atualizar();
     } }];
     if (e) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
@@ -184,19 +215,18 @@ var Treinos = (function () {
     } });
     UI.modal(e ? 'Editar exercício' : 'Novo exercício', [
       UI.campo('Exercício', nome),
-      el('div', { class: 'campos-linha' }, [
-        UI.campo('Carga principal (kg)', carga, 'A série de 100%. Depois de cada treino, vira a carga que você usou.'),
-        UI.campo('Descanso (min)', descanso)
-      ]),
+      el('div', { class: 'campo' }, [el('span', { class: 'campo-rotulo', text: 'Equipamento' }), el('div', { class: 'segmentado' }, botoesEquip), ajudaEquip]),
+      UI.campo('Carga principal (kg)', carga, 'A série válida (100%). Depois de cada treino, vira a carga que você usou.'),
       UI.campo('Observação', obs),
       el('div', { class: 'campo' }, [
         el('span', { class: 'campo-rotulo', text: 'Séries' }),
         el('div', { class: 'serie-cabecalho' }, [el('span', { text: '#' }), el('span', { text: 'Tipo' }), el('span', { text: '% da carga' }), el('span', { text: 'Carga' }), el('span', { text: 'Reps' }), el('span')]),
         caixa,
         el('div', { class: 'atalhos' }, [
-          UI.botao('+ Série', function () { var u = series[series.length - 1]; series.push({ rotulo: 'normal', pct: u ? u.pct : 100, reps: '' }); desenhar(); }, 'btn-secundario btn-mini'),
+          UI.botao('+ Série', function () { var u = series[series.length - 1]; series.push({ rotulo: 'valida', pct: u ? u.pct : 100, reps: '', descanso: u ? u.descanso : 0 }); desenhar(); }, 'btn-secundario btn-mini'),
           UI.botao('Usar padrão 50/75/100%', function () { series = Dados.SERIES_PADRAO.map(function (s) { return Object.assign({}, s); }); desenhar(); }, 'btn-secundario btn-mini')
-        ])
+        ]),
+        el('span', { class: 'campo-ajuda', text: 'Descanso: escreva 45s, 2m ou 1m30s.' })
       ])
     ], botoes, { icone: 'halter' });
     if (!e) nome.focus();
@@ -229,7 +259,7 @@ var Treinos = (function () {
           el('span', { class: 'exercicio-numero', text: i + 1 }),
           el('button', { type: 'button', class: 'exercicio-corpo', title: 'Editar', onclick: function () { editarExercicio(t.id, e.id); } }, [
             el('span', { class: 'exercicio-nome', text: e.nome }),
-            el('span', { class: 'exercicio-meta', text: e.series.length + (e.series.length === 1 ? ' série' : ' séries') + (e.descanso ? ' · descanso ' + String(e.descanso).replace('.', ',') + ' min' : '') + ' · último: ' + textoUltimo(u) }),
+            el('span', { class: 'exercicio-meta', text: metaExercicio(e) + ' · último: ' + textoUltimo(u) }),
             el('span', { class: 'exercicio-series', text: resumoSeries(e) })
           ]),
           el('div', { class: 'treino-cartao-acoes' }, [
@@ -332,7 +362,7 @@ var Treinos = (function () {
       return el('a', { class: 'execucao-item', href: '#/treino/' + e.id }, [
         el('span', { class: 'execucao-item-texto' }, [
           el('span', { class: 'exercicio-nome', text: e.nome }),
-          el('span', { class: 'exercicio-meta', text: e.series.length + (e.series.length === 1 ? ' série' : ' séries') + ' · carga ' + kg(e.carga) }),
+          el('span', { class: 'exercicio-meta', text: e.series.length + (e.series.length === 1 ? ' série' : ' séries') + ' · ' + nomeEquip(e) + ' · carga ' + kg(e.carga) }),
           el('span', { class: 'execucao-ultimo', text: 'Último: ' + textoUltimo(u) })
         ]),
         UI.icone('proximo')
@@ -368,8 +398,10 @@ var Treinos = (function () {
         tabela.appendChild(el('div', { class: 'serie-linha rot-' + s.rotulo }, [
           el('span', { class: 'serie-numero', text: i + 1 }),
           el('span', { class: 'serie-tipo' }, [nomeRotulo(s.rotulo), el('small', { text: s.pct + '%' + (s.reps ? ' · ' + s.reps + ' reps' : '') })]),
-          el('strong', { class: 'serie-carga', text: kg(Dados.cargaDaSerie(base, s)) })
+          el('strong', { class: 'serie-carga', text: kg(Dados.cargaDaSerie(base, s, e.equipamento)) })
         ]));
+        if (s.descanso) tabela.appendChild(el('div', { class: 'descanso-linha' }, [UI.icone('relogio'),
+          (i < e.series.length - 1 ? 'Descanso ' : 'Descanso antes do próximo exercício: ') + UI.fmtTempo(s.descanso)]));
       });
     }
     carga.addEventListener('input', desenhar);
@@ -379,7 +411,7 @@ var Treinos = (function () {
     raiz.appendChild(el('a', { class: 'link voltar-link', href: '#/treino', text: '‹ Todos os exercícios' }));
     raiz.appendChild(el('section', { class: 'painel exercicio-execucao' }, [
       el('h2', { class: 'exercicio-titulo', text: e.nome }),
-      el('div', { class: 'exercicio-meta', text: e.series.length + (e.series.length === 1 ? ' série' : ' séries') + (e.descanso ? ' · descanso ' + String(e.descanso).replace('.', ',') + ' min' : '') }),
+      el('div', { class: 'exercicio-meta', text: e.series.length + (e.series.length === 1 ? ' série' : ' séries') + ' · ' + nomeEquip(e) }),
       e.obs ? el('div', { class: 'exercicio-obs', text: e.obs }) : null,
       el('div', { class: 'ultimo-resultado' }, [
         el('span', { text: 'Último treino' }),
