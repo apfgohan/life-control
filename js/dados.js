@@ -137,8 +137,43 @@ var Dados = (function () {
   var ROTULOS_SERIE = [['aquecimento', 'Aquecimento'], ['preparacao', 'Preparação'], ['valida', 'Válida']];
   var EQUIPAMENTOS = [['livre', 'Peso livre'], ['maquina', 'Máquina']];
   var PASSO_MAQUINA = 5; // nas máquinas o peso sobe de 5 em 5 kg
-  // Três séries padrão: aquecimento a 50% (45 s de descanso), preparação a 75% (2 min) e a válida (100%) até a falha.
-  var SERIES_PADRAO = [{ rotulo: 'aquecimento', pct: 50, reps: '', descanso: 45 }, { rotulo: 'preparacao', pct: 75, reps: '', descanso: 120 }, { rotulo: 'valida', pct: 100, reps: '', descanso: 0 }];
+  // Padrão de cada tipo de série: % da carga, repetições e descanso depois dela. Ajustável em Configurações
+  // (fica em db.padroesSerie); vale para exercícios novos, para "Usar padrão" e ao trocar o tipo de uma série.
+  var PADRAO_SERIE = {
+    aquecimento: { pct: 50, reps: '10', descanso: 60 },
+    preparacao: { pct: 75, reps: '5', descanso: 90 },
+    valida: { pct: 100, reps: '5-9', descanso: 120 }
+  };
+  function padraoSerie(rotulo) {
+    var base = PADRAO_SERIE[rotulo] || PADRAO_SERIE.preparacao, meu = (db.padroesSerie || {})[rotulo] || {};
+    return { rotulo: rotulo, pct: typeof meu.pct === 'number' ? meu.pct : base.pct, reps: typeof meu.reps === 'string' ? meu.reps : base.reps,
+      descanso: typeof meu.descanso === 'number' ? meu.descanso : base.descanso };
+  }
+  function seriesPadrao() { return ['aquecimento', 'preparacao', 'valida'].map(padraoSerie); }
+  function salvarPadroesSerie(campos) {
+    db.padroesSerie = {};
+    Object.keys(PADRAO_SERIE).forEach(function (r) {
+      var c = campos[r] || {}, d = Number(c.descanso);
+      db.padroesSerie[r] = { pct: numero(c.pct, 0, 200, PADRAO_SERIE[r].pct), reps: texto(c.reps), descanso: isFinite(d) ? Math.max(0, Math.min(3600, Math.round(d))) : PADRAO_SERIE[r].descanso };
+    });
+    db.configurado = true;
+    salvar();
+  }
+  function restaurarPadroesSerie() { delete db.padroesSerie; salvar(); }
+  // Faixa de repetições escrita na série ("5-9", "5 a 9", "10") → { min, max }, ou null.
+  function faixaReps(texto) {
+    var m = String(texto || '').match(/(\d+)\s*(?:-|–|a|até)\s*(\d+)/i);
+    if (m) return { min: Number(m[1]), max: Number(m[2]) };
+    m = String(texto || '').match(/^\s*(\d+)\s*$/);
+    return m ? { min: Number(m[1]), max: Number(m[1]) } : null;
+  }
+  // Faixa da série válida do exercício (a última série válida); sem faixa escrita, null.
+  function faixaValida(e) {
+    var v = (e.series || []).filter(function (s) { return s.rotulo === 'valida'; });
+    return v.length ? faixaReps(v[v.length - 1].reps) : null;
+  }
+  // Repetições acima da faixa da série válida: hora de aumentar a carga.
+  function passouDaFaixa(e, reps) { var f = faixaValida(e); return !!(f && reps > f.max); }
 
   function treino(id) { return buscar(db.treinos, id); }
   function treinos(comArquivados) { return db.treinos.filter(function (t) { return comArquivados || !t.arquivado; }).sort(porOrdem); }
@@ -183,7 +218,7 @@ var Dados = (function () {
       return { rotulo: ROTULOS_SERIE.some(function (r) { return r[0] === s.rotulo; }) ? s.rotulo : 'preparacao', pct: numero(s.pct, 0, 200, 100), reps: texto(s.reps),
         descanso: isFinite(d) ? Math.max(0, Math.min(3600, Math.round(d))) : 0 };
     });
-    e.series = series.length ? series : SERIES_PADRAO.map(function (s) { return Object.assign({}, s); });
+    e.series = series.length ? series : seriesPadrao();
     salvar();
     return e;
   }
@@ -430,7 +465,7 @@ var Dados = (function () {
     get db() { return db; },
     salvar: salvar, substituir: substituir, exportar: exportar, importar: importar, limpar: limpar, semDados: semDados, ehDoPrograma: ehDoPrograma,
     atualizarPerfil: atualizarPerfil,
-    TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, SERIES_PADRAO: SERIES_PADRAO, EQUIPAMENTOS: EQUIPAMENTOS, PASSO_MAQUINA: PASSO_MAQUINA,
+    TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, seriesPadrao: seriesPadrao, padraoSerie: padraoSerie, salvarPadroesSerie: salvarPadroesSerie, restaurarPadroesSerie: restaurarPadroesSerie, faixaValida: faixaValida, passouDaFaixa: passouDaFaixa, EQUIPAMENTOS: EQUIPAMENTOS, PASSO_MAQUINA: PASSO_MAQUINA,
     treino: treino, treinos: treinos, salvarTreino: salvarTreino, excluirTreino: excluirTreino, moverTreino: moverTreino,
     exercicio: exercicio, exercicios: exercicios, salvarExercicio: salvarExercicio, excluirExercicio: excluirExercicio, moverExercicio: moverExercicio,
     cargaDaSerie: cargaDaSerie,

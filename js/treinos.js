@@ -165,7 +165,7 @@ var Treinos = (function () {
     var ajudaEquip = el('span', { class: 'campo-ajuda', text: textoEquip() });
     var carga = el('input', { type: 'text', inputMode: 'decimal', value: e && e.carga ? String(e.carga).replace('.', ',') : '', placeholder: 'Ex.: 80' });
     var obs = el('input', { type: 'text', value: e ? e.obs : '', placeholder: 'Ex.: pegada fechada, banco 30° (opcional)', maxLength: 120 });
-    var series = (e ? e.series : Dados.SERIES_PADRAO).map(function (s) { return Object.assign({}, s); });
+    var series = e ? e.series.map(function (s) { return Object.assign({}, s); }) : Dados.seriesPadrao();
     var caixa = el('div', { class: 'editor-series' });
 
     function cargaAtual() { var v = UI.lerValor(carga.value); return v > 0 ? v : 0; }
@@ -185,7 +185,8 @@ var Treinos = (function () {
     function desenhar() {
       caixa.innerHTML = '';
       series.forEach(function (s, i) {
-        var rot = el('select', { onchange: function () { s.rotulo = rot.value; } }, Dados.ROTULOS_SERIE.map(function (r) { return el('option', { value: r[0], text: r[1], selected: s.rotulo === r[0] }); }));
+        // Trocar o tipo aplica o padrão daquele tipo (% da carga, repetições e descanso).
+        var rot = el('select', { onchange: function () { Object.assign(s, Dados.padraoSerie(rot.value)); desenhar(); } }, Dados.ROTULOS_SERIE.map(function (r) { return el('option', { value: r[0], text: r[1], selected: s.rotulo === r[0] }); }));
         var pct = el('input', { type: 'number', min: 0, max: 200, step: 5, value: s.pct, oninput: function () { s.pct = Number(pct.value) || 0; previa.textContent = kg(Dados.cargaDaSerie(cargaAtual(), s, equipamento)); } });
         var reps = el('input', { type: 'text', value: s.reps, placeholder: 'reps', maxLength: 12, oninput: function () { s.reps = reps.value; } });
         var previa = el('span', { class: 'serie-previa', text: kg(Dados.cargaDaSerie(cargaAtual(), s, equipamento)) });
@@ -223,10 +224,11 @@ var Treinos = (function () {
         el('div', { class: 'serie-cabecalho' }, [el('span', { text: '#' }), el('span', { text: 'Tipo' }), el('span', { text: '% da carga' }), el('span', { text: 'Carga' }), el('span', { text: 'Reps' }), el('span')]),
         caixa,
         el('div', { class: 'atalhos' }, [
-          UI.botao('+ Série', function () { var u = series[series.length - 1]; series.push({ rotulo: 'valida', pct: u ? u.pct : 100, reps: '', descanso: u ? u.descanso : 0 }); desenhar(); }, 'btn-secundario btn-mini'),
-          UI.botao('Usar padrão 50/75/100%', function () { series = Dados.SERIES_PADRAO.map(function (s) { return Object.assign({}, s); }); desenhar(); }, 'btn-secundario btn-mini')
+          UI.botao('+ Série', function () { series.push(Dados.padraoSerie('valida')); desenhar(); }, 'btn-secundario btn-mini'),
+          UI.botao('Usar padrão', function () { series = Dados.seriesPadrao(); desenhar(); }, 'btn-secundario btn-mini')
         ]),
-        el('span', { class: 'campo-ajuda', text: 'Descanso: escreva 45s, 2m ou 1m30s.' })
+        el('span', { class: 'campo-ajuda' }, ['Ao trocar o tipo, a série recebe o padrão dele (% , repetições e descanso), que você ajusta em ',
+          el('a', { class: 'link', href: '#/configuracoes', text: 'Configurações' }), '. Descanso: escreva 45s, 2m ou 1m30s.'])
       ])
     ], botoes, { icone: 'halter' });
     if (!e) nome.focus();
@@ -363,7 +365,8 @@ var Treinos = (function () {
         el('span', { class: 'execucao-item-texto' }, [
           el('span', { class: 'exercicio-nome', text: e.nome }),
           el('span', { class: 'exercicio-meta', text: e.series.length + (e.series.length === 1 ? ' série' : ' séries') + ' · ' + nomeEquip(e) + ' · carga ' + kg(e.carga) }),
-          el('span', { class: 'execucao-ultimo', text: 'Último: ' + textoUltimo(u) })
+          el('span', { class: 'execucao-ultimo', text: 'Último: ' + textoUltimo(u) }),
+          u && Dados.passouDaFaixa(e, u.reps) ? el('span', { class: 'aumentar-carga', text: '▲ Hora de aumentar a carga' }) : null
         ]),
         UI.icone('proximo')
       ]);
@@ -381,6 +384,19 @@ var Treinos = (function () {
         ]);
       })));
     }
+  }
+
+  // Próximo peso da máquina (de 5 em 5 kg) acima da carga atual.
+  function proximoPeso(e) { var p = Dados.PASSO_MAQUINA; return (Math.floor((Number(e.carga) || 0) / p + 1e-9) + 1) * p; }
+
+  // Repetições acima da faixa da série válida: parabéns e sugestão de aumentar a carga.
+  function parabens(e, carga, reps, faixa) {
+    UI.modal('Parabéns!', el('div', { class: 'promocao' }, [
+      el('div', { class: 'parabens-icone' }, UI.icone('trofeu')),
+      el('div', { class: 'patente-nome', text: kg(carga) + ' × ' + reps }),
+      el('p', { class: 'modal-desc', text: 'Você passou da faixa de ' + faixa.min + (faixa.max !== faixa.min ? '-' + faixa.max : '') + ' repetições da série válida em ' + e.nome + '.' }),
+      el('p', { class: 'parabens-dica', text: 'Na próxima vez, aumente a carga' + (e.equipamento === 'maquina' ? ' para ' + kg(proximoPeso(e)) : '') + '.' })
+    ]), [{ texto: 'Continuar', classe: 'btn-primario', acao: function () { location.hash = '#/treino'; } }]);
   }
 
   function renderExercicio(raiz, r, exId) {
@@ -418,6 +434,8 @@ var Treinos = (function () {
         el('strong', { text: u ? kg(u.carga) + ' × ' + u.reps + ' repetições' : 'Primeira vez' }),
         u ? el('small', { text: UI.fmtData(u.data) }) : null
       ]),
+      u && Dados.passouDaFaixa(e, u.reps) ? el('div', { class: 'aumentar-carga destaque' }, [UI.icone('progresso'),
+        'Da última vez você passou de ' + Dados.faixaValida(e).max + ' repetições: aumente a carga hoje' + (e.equipamento === 'maquina' ? ' (próximo peso: ' + kg(proximoPeso(e)) + ').' : '.')]) : null,
       tabela,
       el('div', { class: 'registrar-serie' }, [
         el('div', { class: 'campos-linha' }, [
@@ -429,8 +447,9 @@ var Treinos = (function () {
           if (!(c >= 0) || carga.value.trim() === '') { UI.aviso('Informe a carga.'); carga.focus(); return; }
           if (!(n > 0)) { UI.aviso('Informe as repetições.'); reps.focus(); return; }
           Dados.concluirExercicio(r.id, e.id, c, n);
-          UI.aviso(e.nome + ' concluído');
-          location.hash = '#/treino';
+          var faixa = Dados.faixaValida(e);
+          if (faixa && n > faixa.max) parabens(e, c, n, faixa);
+          else { UI.aviso(e.nome + ' concluído'); location.hash = '#/treino'; }
         }, 'btn-primario btn-grande', 'check'),
         feito ? UI.botao('Desmarcar como feito', function () { Dados.desfazerExercicio(r.id, e.id); location.hash = '#/treino'; }, 'btn-secundario') : null
       ])
