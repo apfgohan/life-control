@@ -135,7 +135,7 @@ var Dados = (function () {
   // ---------- Treinos (cadastro) ----------
   var TIPOS_TREINO = [['musculacao', 'Musculação'], ['corrida', 'Corrida']];
   var ROTULOS_SERIE = [['aquecimento', 'Aquecimento'], ['preparacao', 'Preparação'], ['valida', 'Válida']];
-  var EQUIPAMENTOS = [['livre', 'Peso livre'], ['maquina', 'Máquina']];
+  var EQUIPAMENTOS = [['livre', 'Peso livre'], ['maquina', 'Máquina'], ['corpo', 'Peso do corpo']]; // corpo: sem carga, só repetições
   var PASSO_MAQUINA = 5; // nas máquinas o peso sobe de 5 em 5 kg
   // Padrão de cada tipo de série: % da carga, repetições e descanso depois dela. Ajustável em Configurações
   // (fica em db.padroesSerie); vale para exercícios novos, para "Usar padrão" e ao trocar o tipo de uma série.
@@ -209,8 +209,8 @@ var Dados = (function () {
     var t = treino(treinoId), e = exId ? buscar(t.exercicios, exId) : null;
     if (!e) { e = { id: novoId(), ordem: proximaOrdem(t.exercicios) }; t.exercicios.push(e); }
     e.nome = texto(campos.nome) || 'Exercício';
-    e.equipamento = campos.equipamento === 'maquina' ? 'maquina' : 'livre';
-    e.carga = numero(campos.carga, 0, 1000, 0);
+    e.equipamento = campos.equipamento === 'maquina' || campos.equipamento === 'corpo' ? campos.equipamento : 'livre';
+    e.carga = e.equipamento === 'corpo' ? 0 : numero(campos.carga, 0, 1000, 0);
     delete e.descanso;
     e.obs = texto(campos.obs);
     var series = (campos.series || []).map(function (s) {
@@ -232,6 +232,7 @@ var Dados = (function () {
   // Carga de uma série: % da carga principal. Peso livre: arredondada para o kg mais próximo.
   // Máquina: arredondada para baixo, para o múltiplo de 5 kg (85 kg a 50% = 42,5 → 40 kg).
   function cargaDaSerie(carga, serie, equipamento) {
+    if (equipamento === 'corpo') return 0;
     var v = (Number(carga) || 0) * (Number(serie.pct) || 0) / 100;
     if (equipamento === 'maquina') return Math.floor(v / PASSO_MAQUINA + 1e-9) * PASSO_MAQUINA;
     return Math.round(v);
@@ -258,7 +259,8 @@ var Dados = (function () {
   // Concluir um exercício: guarda carga e repetições da última série, e a carga vira a principal do próximo treino.
   function concluirExercicio(registroId, exId, carga, reps) {
     var r = registro(registroId), e = exercicio(r.treinoId, exId);
-    var item = { exercicioId: exId, nome: e ? e.nome : '', carga: numero(carga, 0, 1000, 0), reps: Math.round(numero(reps, 0, 999, 0)), concluidoEm: Date.now() };
+    var semCarga = !!(e && e.equipamento === 'corpo');
+    var item = { exercicioId: exId, nome: e ? e.nome : '', semCarga: semCarga, carga: semCarga ? 0 : numero(carga, 0, 1000, 0), reps: Math.round(numero(reps, 0, 999, 0)), concluidoEm: Date.now() };
     r.exercicios = r.exercicios.filter(function (x) { return x.exercicioId !== exId; }).concat([item]);
     if (e && item.carga > 0) e.carga = item.carga;
     salvar();
@@ -293,7 +295,7 @@ var Dados = (function () {
     var h = historico();
     for (var i = 0; i < h.length; i++) {
       var x = h[i].exercicios.filter(function (e) { return e.exercicioId === exId; })[0];
-      if (x) return { carga: x.carga, reps: x.reps, data: h[i].data };
+      if (x) return { carga: x.carga, reps: x.reps, semCarga: !!x.semCarga, data: h[i].data };
     }
     return null;
   }
