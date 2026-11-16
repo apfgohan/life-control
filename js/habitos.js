@@ -135,10 +135,11 @@ var Habitos = (function () {
     var p = Dados.progressoHabito(h, iso), auto = automatica(h), diariaSimples = h.periodo === 'dia' && p.alvo === 1;
     var seq = Dados.sequenciaHabito(h), feitoHoje = !!h.feitos[iso];
     var marca = auto
-      ? el('span', { class: 'btn-check auto' + (p.completo ? ' marcado' : ''), title: p.completo ? 'Cumprida' : 'Marca sozinha' }, UI.icone(p.completo ? 'check' : iconeArea(h.area)))
+      ? el('span', { class: 'btn-check auto' + (p.completo ? ' marcado' : ''), title: p.completo ? 'Cumprida' : 'Marca sozinha' }, UI.icone('check'))
       : el('button', { type: 'button', class: 'btn-check' + (feitoHoje ? ' marcado' : ''), title: feitoHoje ? 'Desmarcar' : 'Marcar que fiz', onclick: function () { alternar(h, iso); } }, UI.icone('check'));
     return el('div', { class: 'habito area-' + h.area + (p.completo ? ' completo' : '') }, [
       marca,
+      UI.simboloMeta(h.area),
       el('button', { type: 'button', class: 'habito-corpo', title: 'Editar', onclick: function () { editar(h.id); } }, [
         el('span', { class: 'habito-titulo', text: h.titulo }),
         el('span', { class: 'habito-meta' }, [
@@ -155,7 +156,6 @@ var Habitos = (function () {
       ])
     ]);
   }
-  function iconeArea(a) { return a === 'estudo' ? 'livro' : a === 'treino' ? 'halter' : a === 'dieta' ? 'prato' : 'alvo'; }
 
   // Metas que valem num dia, separadas por frequência.
   function doDia(iso) {
@@ -227,6 +227,7 @@ var Habitos = (function () {
             if (Dados.habitoValeNoDia(h, hoje)) return linha(h, hoje);
             return el('div', { class: 'habito inativo' }, [
               el('span', { class: 'btn-check desligado', title: 'Não vale hoje' }),
+              UI.simboloMeta(h.area),
               el('button', { type: 'button', class: 'habito-corpo', title: 'Editar', onclick: function () { editar(h.id); } }, [
                 el('span', { class: 'habito-titulo', text: h.titulo }), el('span', { class: 'habito-meta', text: nomeArea(h.area) + ' · ' + descricao(h) + ' · não vale hoje' })
               ])

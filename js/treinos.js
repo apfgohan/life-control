@@ -156,22 +156,48 @@ var Treinos = (function () {
 
   // ---------- Cadastro: exercícios de um treino ----------
   function editarExercicio(treinoId, exId) {
-    var e = exId ? Dados.exercicio(treinoId, exId) : null;
-    var nome = el('input', { type: 'text', value: e ? e.nome : '', placeholder: 'Ex.: T-Bar Row', maxLength: 60 });
+    var e = exId ? Dados.exercicio(treinoId, exId) : null, t = Dados.treino(treinoId);
+    // O exercício vem da biblioteca (Configurações); aqui só se ajustam carga, séries, repetições e descanso.
+    var baseId = e ? e.baseId : null;
     var equipamento = (e && e.equipamento) || 'livre';
-    var botoesEquip = Dados.EQUIPAMENTOS.map(function (x) {
-      return el('button', { type: 'button', class: equipamento === x[0] ? 'ativo' : '', text: x[1], onclick: function () {
-        equipamento = x[0];
-        botoesEquip.forEach(function (b, i) { b.classList.toggle('ativo', Dados.EQUIPAMENTOS[i][0] === equipamento); });
-        ajudaEquip.textContent = textoEquip();
-        desenhar();
-      } });
+    var selBase = el('select');
+    function preencherBases() {
+      selBase.innerHTML = '';
+      var noTreino = t.exercicios.filter(function (x) { return x.id !== exId; }).map(function (x) { return x.baseId; });
+      selBase.appendChild(el('option', { value: '', text: 'Escolha o exercício…', disabled: true, selected: !baseId }));
+      Dados.GRUPOS.forEach(function (g) {
+        var doGrupo = Dados.biblioteca(g[0]).filter(function (b) { return noTreino.indexOf(b.id) < 0 || b.id === baseId; });
+        if (doGrupo.length) selBase.appendChild(el('optgroup', { label: g[1] }, doGrupo.map(function (b) { return el('option', { value: b.id, text: b.nome, selected: b.id === baseId }); })));
+      });
+      selBase.appendChild(el('option', { value: '__novo', text: '+ Cadastrar novo exercício…' }));
+    }
+    function escolher(id) {
+      var b = Dados.base(id);
+      baseId = b ? b.id : null;
+      if (b) {
+        equipamento = b.equipamento;
+        // Mesma carga que o exercício já tem em outro treino.
+        if (!carga.value.trim()) {
+          var outro = null;
+          Dados.treinos().forEach(function (x) { x.exercicios.forEach(function (y) { if (y.baseId === b.id && y.carga && !outro) outro = y; }); });
+          if (outro) carga.value = String(outro.carga).replace('.', ',');
+        }
+      }
+      var pr = b ? Dados.prDaBase(b.id) : null;
+      ajudaEquip.textContent = b ? textoEquip() + (pr ? ' · PR: ' + Configuracoes.textoPR(pr) : '') : '';
+      desenhar();
+    }
+    selBase.addEventListener('change', function () {
+      if (selBase.value !== '__novo') { escolher(selBase.value); return; }
+      selBase.value = baseId || '';
+      Configuracoes.editarExercicio(null, null, function (b) { baseId = b.id; preencherBases(); escolher(b.id); });
     });
     function textoEquip() {
-      if (equipamento === 'corpo') return 'Sem carga: você registra só as repetições.';
-      return equipamento === 'maquina' ? 'Cargas arredondadas para baixo, de ' + Dados.PASSO_MAQUINA + ' em ' + Dados.PASSO_MAQUINA + ' kg (85 kg a 50% = 40 kg).' : 'Cargas arredondadas para o kg mais próximo.';
+      var nome = Dados.EQUIPAMENTOS.filter(function (q) { return q[0] === equipamento; })[0][1];
+      if (equipamento === 'corpo') return nome + ': sem carga, você registra só as repetições.';
+      return nome + ': ' + (equipamento === 'maquina' ? 'cargas arredondadas para baixo, de ' + Dados.PASSO_MAQUINA + ' em ' + Dados.PASSO_MAQUINA + ' kg (85 kg a 50% = 40 kg).' : 'cargas arredondadas para o kg mais próximo.');
     }
-    var ajudaEquip = el('span', { class: 'campo-ajuda', text: textoEquip() });
+    var ajudaEquip = el('span', { class: 'campo-ajuda' });
     var carga = el('input', { type: 'text', inputMode: 'decimal', value: e && e.carga ? String(e.carga).replace('.', ',') : '', placeholder: 'Ex.: 80' });
     var campoCarga = UI.campo('Carga principal (kg)', carga, 'A série válida (100%). Depois de cada treino, vira a carga que você usou.');
     var cabecalho = el('div', { class: 'serie-cabecalho' });
@@ -219,23 +245,24 @@ var Treinos = (function () {
       });
     }
     carga.addEventListener('input', desenhar);
-    desenhar();
+    preencherBases();
+    escolher(baseId);
 
     var botoes = [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Salvar', classe: 'btn-primario', acao: function () {
-      if (!nome.value.trim()) { nome.focus(); return false; }
+      if (!Dados.base(baseId)) { UI.aviso('Escolha o exercício (ou cadastre um novo).'); selBase.focus(); return false; }
       if (!series.length) { UI.aviso('Coloque pelo menos uma série.'); return false; }
       if (caixa.querySelector('.invalido')) { UI.aviso('Descanso inválido. Use, por exemplo, 45s, 2m ou 1m30s.'); caixa.querySelector('.invalido').focus(); return false; }
-      Dados.salvarExercicio(treinoId, { nome: nome.value, equipamento: equipamento, carga: carga.value, obs: obs.value, series: series }, exId);
+      Dados.salvarExercicio(treinoId, { baseId: baseId, carga: carga.value, obs: obs.value, series: series }, exId);
       App.atualizar();
     } }];
     if (e) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
       UI.confirmar('Tirar "' + e.nome + '" deste treino? Os registros antigos dele continuam no histórico.', function () { Dados.excluirExercicio(treinoId, e.id); App.atualizar(); });
     } });
-    UI.modal(e ? 'Editar exercício' : 'Novo exercício', [
-      UI.campo('Exercício', nome),
-      el('div', { class: 'campo' }, [el('span', { class: 'campo-rotulo', text: 'Equipamento' }), el('div', { class: 'segmentado' }, botoesEquip), ajudaEquip]),
+    UI.modal(e ? 'Editar exercício' : 'Adicionar exercício', [
+      el('div', { class: 'campo' }, [el('span', { class: 'campo-rotulo', text: 'Exercício' }), selBase, ajudaEquip,
+        el('span', { class: 'campo-ajuda' }, ['Nome, grupamento e equipamento ficam na biblioteca, em ', el('a', { class: 'link', href: '#/configuracoes', text: 'Configurações' }), '.'])]),
       campoCarga,
-      UI.campo('Observação', obs),
+      UI.campo('Observação neste treino', obs),
       el('div', { class: 'campo' }, [
         el('span', { class: 'campo-rotulo', text: 'Séries' }),
         cabecalho,
@@ -248,7 +275,6 @@ var Treinos = (function () {
           el('a', { class: 'link', href: '#/configuracoes', text: 'Configurações' }), '. Descanso: escreva 45s, 2m ou 1m30s.'])
       ])
     ], botoes, { icone: 'halter' });
-    if (!e) nome.focus();
   }
 
   function renderTreino(raiz, id) {
@@ -273,12 +299,12 @@ var Treinos = (function () {
     ]));
     else {
       raiz.appendChild(el('div', { class: 'lista-exercicios' }, exs.map(function (e, i) {
-        var u = Dados.ultimoResultado(e.id);
+        var u = Dados.ultimoResultado(e.id), pr = e.baseId ? Dados.prDaBase(e.baseId) : null;
         return el('div', { class: 'exercicio-cartao' }, [
           el('span', { class: 'exercicio-numero', text: i + 1 }),
           el('button', { type: 'button', class: 'exercicio-corpo', title: 'Editar', onclick: function () { editarExercicio(t.id, e.id); } }, [
             el('span', { class: 'exercicio-nome', text: e.nome }),
-            el('span', { class: 'exercicio-meta', text: metaExercicio(e) + ' · último: ' + textoUltimo(u) }),
+            el('span', { class: 'exercicio-meta', text: metaExercicio(e) + ' · último: ' + textoUltimo(u) + (pr ? ' · PR: ' + resultado(pr.carga, pr.reps, pr.semCarga) : '') }),
             el('span', { class: 'exercicio-series', text: resumoSeries(e) })
           ]),
           el('div', { class: 'treino-cartao-acoes' }, [
@@ -407,13 +433,17 @@ var Treinos = (function () {
   function proximoPeso(e) { var p = Dados.PASSO_MAQUINA; return (Math.floor((Number(e.carga) || 0) / p + 1e-9) + 1) * p; }
 
   // Repetições acima da faixa da série válida: parabéns e sugestão de aumentar a carga.
-  function parabens(e, carga, reps, faixa) {
-    UI.modal('Parabéns!', el('div', { class: 'promocao' }, [
+  // Também comemora um novo recorde (PR) e as metas de recorde batidas agora.
+  function parabens(e, carga, reps, faixa, res) {
+    res = res || { metas: [] };
+    UI.modal(res.novoPR ? 'Novo recorde!' : 'Parabéns!', el('div', { class: 'promocao' }, [
       el('div', { class: 'parabens-icone' }, UI.icone('trofeu')),
       el('div', { class: 'patente-nome', text: resultado(carga, reps, semCarga(e)) }),
-      el('p', { class: 'modal-desc', text: 'Você passou da faixa de ' + faixa.min + (faixa.max !== faixa.min ? '-' + faixa.max : '') + ' repetições da série válida em ' + e.nome + '.' }),
-      el('p', { class: 'parabens-dica', text: semCarga(e) ? 'Na próxima vez, deixe mais difícil: uma variação mais pesada ou um peso extra.'
-        : 'Na próxima vez, aumente a carga' + (e.equipamento === 'maquina' ? ' para ' + kg(proximoPeso(e)) : '') + '.' })
+      res.novoPR ? el('p', { class: 'modal-desc', text: 'Novo PR em ' + e.nome + '! O anterior era ' + resultado(res.prAnterior.carga, res.prAnterior.reps, res.prAnterior.semCarga) + ' (' + UI.fmtDiaMes(res.prAnterior.data) + ').' }) : null,
+      res.metas.map(function (m) { return el('p', { class: 'parabens-meta', text: 'Meta batida: ' + m.titulo + ' · +' + UI.fmtNum(Dados.xpDaMeta(m)) + ' XP' }); }),
+      faixa ? el('p', { class: 'modal-desc', text: 'Você passou da faixa de ' + faixa.min + (faixa.max !== faixa.min ? '-' + faixa.max : '') + ' repetições da série válida em ' + e.nome + '.' }) : null,
+      faixa ? el('p', { class: 'parabens-dica', text: semCarga(e) ? 'Na próxima vez, deixe mais difícil: uma variação mais pesada ou um peso extra.'
+        : 'Na próxima vez, aumente a carga' + (e.equipamento === 'maquina' ? ' para ' + kg(proximoPeso(e)) : '') + '.' }) : null
     ]), [{ texto: 'Continuar', classe: 'btn-primario', acao: function () { location.hash = '#/treino'; } }]);
   }
 
@@ -421,6 +451,9 @@ var Treinos = (function () {
     var e = Dados.exercicio(r.treinoId, exId);
     if (!e) { location.hash = '#/treino'; return; }
     var feito = Dados.feitoNoRegistro(r, e.id), u = Dados.ultimoResultado(e.id);
+    // PR sem contar o que já foi registrado neste treino (para comparar com o de hoje).
+    var pr = e.baseId ? Dados.resultadosDaBase(e.baseId).filter(function (x) { return !(feito && x.registroId === r.id); })
+      .reduce(function (m, x) { return !m || (x.semCarga ? x.reps > m.reps : x.carga > m.carga || (x.carga === m.carga && x.reps > m.reps)) ? x : m; }, null) : null;
     var carga = el('input', { type: 'text', inputMode: 'decimal', value: String(feito ? feito.carga : e.carga || '').replace('.', ','), placeholder: 'kg' });
     var reps = el('input', { type: 'number', inputMode: 'numeric', min: 0, max: 999, value: feito ? feito.reps : '', placeholder: u ? 'último: ' + u.reps : 'reps' });
     var tabela = el('div', { class: 'series-execucao' });
@@ -456,6 +489,11 @@ var Treinos = (function () {
         el('strong', { text: u ? resultado(u.carga, u.reps, u.semCarga, true) : 'Primeira vez' }),
         u ? el('small', { text: UI.fmtData(u.data) }) : null
       ]),
+      pr ? el('div', { class: 'ultimo-resultado resultado-pr' }, [
+        el('span', null, [UI.icone('trofeu'), ' Recorde (PR)']),
+        el('strong', { text: resultado(pr.carga, pr.reps, pr.semCarga, true) }),
+        el('small', { text: UI.fmtData(pr.data) })
+      ]) : null,
       u && Dados.passouDaFaixa(e, u.reps) ? el('div', { class: 'aumentar-carga destaque' }, [UI.icone('progresso'),
         'Da última vez você passou de ' + Dados.faixaValida(e).max + ' repetições: ' + (semCarga(e) ? 'deixe o exercício mais difícil hoje.'
           : 'aumente a carga hoje' + (e.equipamento === 'maquina' ? ' (próximo peso: ' + kg(proximoPeso(e)) + ').' : '.'))]) : null,
@@ -469,9 +507,9 @@ var Treinos = (function () {
           var c = semCarga(e) ? 0 : UI.lerValor(carga.value), n = Number(reps.value);
           if (!semCarga(e) && (!(c >= 0) || carga.value.trim() === '')) { UI.aviso('Informe a carga.'); carga.focus(); return; }
           if (!(n > 0)) { UI.aviso('Informe as repetições.'); reps.focus(); return; }
-          Dados.concluirExercicio(r.id, e.id, c, n);
-          var faixa = Dados.faixaValida(e);
-          if (faixa && n > faixa.max) parabens(e, c, n, faixa);
+          var res = Dados.concluirExercicio(r.id, e.id, c, n);
+          var faixa = Dados.faixaValida(e), passou = faixa && n > faixa.max;
+          if (passou || res.novoPR || res.metas.length) parabens(e, c, n, passou ? faixa : null, res);
           else { UI.aviso(e.nome + ' concluído'); location.hash = '#/treino'; }
         }, 'btn-primario btn-grande', 'check'),
         feito ? UI.botao('Desmarcar como feito', function () { Dados.desfazerExercicio(r.id, e.id); location.hash = '#/treino'; }, 'btn-secundario') : null

@@ -28,9 +28,72 @@ var Inicio = (function () {
     ]));
   }
 
+  // Contador do mês: metas (cada ocorrência) batidas, que falharam e que faltam, e o índice que multiplica o XP do mês.
+  function painelMes() {
+    var hoje = UI.hoje(), s = Dados.resumoDoMes(hoje.slice(0, 7), hoje), f = s.faixa;
+    var nomeMes = UI.nomeMes(hoje.slice(0, 7)).split(' ')[0].toLowerCase();
+    function mult(v) { return '×' + String(v).replace('.', ','); }
+    function bloco(rotulo, valor, classe) {
+      return el('div', { class: 'mes-numero ' + (classe || '') }, [el('strong', { text: valor }), el('span', { text: rotulo })]);
+    }
+    // Quantas batidas seguidas (sem falhar) levam à próxima faixa, se ainda der neste mês.
+    var dica = null, decididas = s.batidas + s.falharam;
+    if (f) {
+      var i = Dados.FAIXAS_MES.indexOf(f), prox = i > 0 ? Dados.FAIXAS_MES[i - 1] : null;
+      if (prox) {
+        var p = prox.min / 100, k = p >= 1 ? (s.falharam ? Infinity : 0) : Math.max(0, Math.ceil((p * decididas - s.batidas) / (1 - p) - 1e-9));
+        if (k > 0 && k <= s.faltam) dica = 'Mais ' + k + (k === 1 ? ' meta batida' : ' metas batidas') + ' sem falhar e você chega a ' + prox.nome + ' (' + mult(prox.mult) + ').';
+      }
+    }
+    var partes = [['batidas', s.batidas], ['falharam', s.falharam], ['faltam', s.faltam]].filter(function (x) { return x[1] > 0; });
+    return el('section', { class: 'painel painel-mes' + (f ? ' faixa-' + f.id : '') }, [
+      el('div', { class: 'painel-lado-topo' }, [
+        el('h2', { class: 'secao-titulo' }, [UI.icone('calendario'), 'Metas de ' + nomeMes]),
+        el('button', { type: 'button', class: 'link', text: 'Como funciona', onclick: explicarIndice })
+      ]),
+      s.total ? el('div', { class: 'mes-corpo' }, [
+        el('div', { class: 'mes-indice', title: 'Índice do mês' }, [
+          el('span', { class: 'mes-escudo' }, UI.icone('escudo')),
+          el('div', { class: 'mes-indice-texto' }, [
+            el('strong', { class: 'mes-faixa', text: f ? f.nome : 'Sem índice ainda' }),
+            el('span', { text: f ? Math.floor(s.pct) + '% batidas · XP do mês ' + mult(f.mult) : 'Aparece quando a primeira meta do mês for decidida.' })
+          ])
+        ]),
+        el('div', { class: 'mes-numeros' }, [
+          bloco('metas no mês', s.total),
+          bloco('batidas', s.batidas, 'positivo'),
+          bloco('falharam', s.falharam, s.falharam ? 'negativo' : ''),
+          bloco('faltam', s.faltam)
+        ]),
+        el('div', { class: 'mes-barra', role: 'img', 'aria-label': s.batidas + ' batidas, ' + s.falharam + ' falharam, ' + s.faltam + ' faltam' }, partes.map(function (x) {
+          return el('span', { class: 'mes-seg seg-' + x[0], style: { flexGrow: String(x[1]) }, title: x[1] + ' ' + x[0] });
+        })),
+        dica ? el('p', { class: 'mes-dica', text: dica }) : null
+      ]) : el('p', { class: 'modal-desc', text: 'Crie metas recorrentes ou de longo prazo com prazo neste mês para acompanhar o índice.' })
+    ]);
+  }
+
+  function explicarIndice() {
+    var s = Dados.resumoDoMes(UI.hoje().slice(0, 7));
+    UI.modal('Índice do mês', [
+      el('p', { class: 'modal-desc', text: 'Cada ocorrência conta como uma meta: cada dia de uma meta diária, cada semana de uma semanal (a semana entra no mês do seu domingo), a meta mensal e as metas de longo prazo com prazo no mês. Falhou = o período acabou sem cumprir; falta = ainda vai acontecer ou está em curso.' }),
+      el('p', { class: 'modal-desc', text: 'O índice é a % das metas batidas entre as já decididas (batidas + falharam). Ele multiplica todo o XP ganho no mês: treinos, dieta, metas e lembretes.' }),
+      el('div', { class: 'faixas-mes' }, Dados.FAIXAS_MES.map(function (f, i) {
+        var anterior = Dados.FAIXAS_MES[i - 1];
+        return el('div', { class: 'faixa-linha faixa-' + f.id + (s.faixa === f ? ' atual' : '') }, [
+          el('span', { class: 'mes-escudo' }, UI.icone('escudo')),
+          el('strong', { text: f.nome }),
+          el('span', { class: 'faixa-pct', text: f.min === 100 ? '100%' : f.min ? f.min + '% a ' + (anterior.min - 1) + '%' : 'abaixo de ' + anterior.min + '%' }),
+          el('span', { class: 'faixa-mult', text: '×' + String(f.mult).replace('.', ',') })
+        ]);
+      }))
+    ], [{ texto: 'Fechar', classe: 'btn-primario' }], { icone: 'escudo' });
+  }
+
   function render(raiz) {
     raiz.appendChild(saudacao());
     raiz.appendChild(painelAvisos());
+    raiz.appendChild(painelMes());
     var semanal = Dieta.painelPendente();
     if (semanal) raiz.appendChild(semanal);
     raiz.appendChild(Treinos.painelInicio());

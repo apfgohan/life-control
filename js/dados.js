@@ -13,8 +13,11 @@ var Dados = (function () {
       app: 'life-control',
       perfil: { nome: '', foto: null },   // foto: imagem enviada, em data URL
       // Treinos cadastrados. Musculação: exercícios com séries em % da carga principal (a série de 100%).
+      // Biblioteca de exercícios (Configurações), por grupamento. Os treinos usam exercícios daqui (baseId),
+      // e o recorde pessoal (PR) de cada um é calculado de todos os treinos registrados.
+      exercicios: [],   // { id, nome, grupo: 'bracos'|'torso'|'pernas', equipamento, obs, arquivado, criadoEm }
       treinos: [],      // { id, nome, tipo: 'musculacao'|'corrida', ordem, arquivado, criadoEm,
-                        //   exercicios: [{ id, nome, equipamento: 'maquina'|'livre', carga, obs,
+                        //   exercicios: [{ id, baseId, nome, equipamento: 'maquina'|'livre', carga, obs,
                         //                  series: [{ rotulo, pct, reps, descanso (segundos depois desta série) }] }] }
       // Treinos feitos. fim null = treino em andamento (continua em qualquer aparelho).
       registros: [],    // { id, treinoId, nomeTreino, tipo, data, inicio, fim, exercicios: [{ exercicioId, nome, carga, reps, concluidoEm }],
@@ -47,7 +50,7 @@ var Dados = (function () {
   function normalizar(d) {
     var v = vazio();
     if (!d || typeof d !== 'object') return v;
-    ['treinos', 'registros', 'lembretes', 'metas', 'habitos', 'medidas'].forEach(function (k) { if (!Array.isArray(d[k])) d[k] = []; });
+    ['exercicios', 'treinos', 'registros', 'lembretes', 'metas', 'habitos', 'medidas'].forEach(function (k) { if (!Array.isArray(d[k])) d[k] = []; });
     if (!d.dieta || typeof d.dieta !== 'object') d.dieta = { desde: null, refeicoes: [] };
     if (!Array.isArray(d.dieta.refeicoes)) d.dieta.refeicoes = [];
     if (!Array.isArray(d.dieta.frutas)) d.dieta.frutas = [];
@@ -89,6 +92,9 @@ var Dados = (function () {
   }
 
   var db = carregar();
+  // Depois de carregar (ou trocar) os dados: monta a biblioteca de exercícios a partir dos treinos antigos
+  // e recalcula as metas de recorde. A primeira chamada fica no fim do arquivo, quando as constantes já existem.
+  function preparar() { migrarBiblioteca(); sincronizarMetasPR(); }
 
   // Salva no navegador (cópia rápida) e avisa a pasta de dados e a nuvem para gravarem também.
   function salvar() {
@@ -98,6 +104,7 @@ var Dados = (function () {
     if (window.Nuvem) Nuvem.agendar();
   }
   function gravarNoNavegador() {
+    cacheMes = {}; // os dados mudaram: o resumo dos meses é refeito
     try { localStorage.setItem(CHAVE, JSON.stringify(db)); } catch (e) {
       console.error('Falha ao salvar', e);
       if (window.UI) UI.aviso('Não foi possível salvar neste navegador (espaço cheio?).');
@@ -105,6 +112,7 @@ var Dados = (function () {
   }
   function substituir(dados, origem) {
     db = normalizar(dados);
+    preparar();
     gravarNoNavegador();
     if (origem !== 'arquivo' && window.Armazenamento) Armazenamento.agendar();
     if (origem !== 'nuvem' && window.Nuvem) Nuvem.agendar();
@@ -114,6 +122,7 @@ var Dados = (function () {
     var d = JSON.parse(texto);
     if (!ehDoPrograma(d)) throw new Error('Arquivo não parece ser um backup deste programa.');
     db = normalizar(d);
+    preparar();
     salvar();
   }
   function limpar() { db = vazio(); salvar(); }
@@ -122,7 +131,7 @@ var Dados = (function () {
   function semDados(d) {
     d = d || db;
     if (!d) return true;
-    return !d.configurado && !['treinos', 'registros', 'lembretes', 'metas', 'habitos', 'medidas', 'lancamentos'].some(function (k) { return Array.isArray(d[k]) && d[k].length; })
+    return !d.configurado && !['exercicios', 'treinos', 'registros', 'lembretes', 'metas', 'habitos', 'medidas', 'lancamentos'].some(function (k) { return Array.isArray(d[k]) && d[k].length; })
       && !(d.dieta && Array.isArray(d.dieta.refeicoes) && d.dieta.refeicoes.length);
   }
 
@@ -139,6 +148,7 @@ var Dados = (function () {
     if (!isFinite(n)) return padrao;
     return Math.max(min, Math.min(max, n));
   }
+  function somarMes(mapa, iso, v) { if (!iso) return; var k = iso.slice(0, 7); mapa[k] = (mapa[k] || 0) + v; }
   function diasNoMes(mes) { var p = mes.split('-'); return new Date(Number(p[0]), Number(p[1]), 0).getDate(); }
 
   // ---------- Perfil ----------
@@ -225,8 +235,13 @@ var Dados = (function () {
   function salvarExercicio(treinoId, campos, exId) {
     var t = treino(treinoId), e = exId ? buscar(t.exercicios, exId) : null;
     if (!e) { e = { id: novoId(), ordem: proximaOrdem(t.exercicios) }; t.exercicios.push(e); }
-    e.nome = texto(campos.nome) || 'Exercício';
-    e.equipamento = campos.equipamento === 'maquina' || campos.equipamento === 'corpo' ? campos.equipamento : 'livre';
+    // O exercício vem da biblioteca: nome e equipamento são os dela.
+    var b = base(campos.baseId);
+    if (b) { e.baseId = b.id; e.nome = b.nome; e.equipamento = b.equipamento; }
+    else {
+      e.nome = texto(campos.nome) || 'Exercício';
+      e.equipamento = campos.equipamento === 'maquina' || campos.equipamento === 'corpo' ? campos.equipamento : 'livre';
+    }
     e.carga = e.equipamento === 'corpo' ? 0 : numero(campos.carga, 0, 1000, 0);
     delete e.descanso;
     e.obs = texto(campos.obs);
@@ -255,6 +270,103 @@ var Dados = (function () {
     return Math.round(v);
   }
 
+  // ---------- Biblioteca de exercícios e recordes (PR) ----------
+  var GRUPOS = [['bracos', 'Braços'], ['torso', 'Torso'], ['pernas', 'Pernas']];
+  function semAcento(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); }
+  // Para os exercícios que já existiam: um palpite do grupamento pelo nome (dá para trocar em Configurações).
+  function adivinharGrupo(nome) {
+    var n = semAcento(nome);
+    if (/agach|squat|leg|stiff|panturr|gemeo|extensora|flexora|afundo|passada|lunge|bulgar|hack|glute|abdutor|adutor|coxa|terra|elevacao pelvica|hip thrust|cadeira|mesa flex/.test(n)) return 'pernas';
+    if (/rosca|bicep|tricep|martelo|antebraco|scott|curl|frances|testa|punho/.test(n)) return 'bracos';
+    return 'torso';
+  }
+  function base(id) { return id ? buscar(db.exercicios, id) : null; }
+  function biblioteca(grupo, comArquivados) {
+    return db.exercicios.filter(function (b) { return (comArquivados || !b.arquivado) && (!grupo || b.grupo === grupo); })
+      .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+  }
+  function novaBase(nome, grupo, equipamento) {
+    var b = { id: novoId(), nome: texto(nome) || 'Exercício', grupo: GRUPOS.some(function (g) { return g[0] === grupo; }) ? grupo : adivinharGrupo(nome),
+      equipamento: equipamento === 'maquina' || equipamento === 'corpo' ? equipamento : 'livre', obs: '', arquivado: false, criadoEm: Date.now() };
+    db.exercicios.push(b);
+    return b;
+  }
+  function salvarBase(campos, id) {
+    var b = base(id);
+    if (!b) b = novaBase(campos.nome, campos.grupo, campos.equipamento);
+    b.nome = texto(campos.nome) || b.nome;
+    if (GRUPOS.some(function (g) { return g[0] === campos.grupo; })) b.grupo = campos.grupo;
+    if (campos.equipamento) b.equipamento = campos.equipamento === 'maquina' || campos.equipamento === 'corpo' ? campos.equipamento : 'livre';
+    b.obs = texto(campos.obs);
+    b.arquivado = false;
+    // Os treinos que usam este exercício passam a mostrar o nome e o equipamento novos.
+    db.treinos.forEach(function (t) { t.exercicios.forEach(function (e) { if (e.baseId === b.id) { e.nome = b.nome; e.equipamento = b.equipamento; if (b.equipamento === 'corpo') e.carga = 0; } }); });
+    salvar();
+    return b;
+  }
+  // Treinos (não arquivados) que usam o exercício.
+  function treinosComBase(id) { return treinos().filter(function (t) { return t.exercicios.some(function (e) { return e.baseId === id; }); }); }
+  // Com histórico: arquiva (o PR continua). Sem: exclui. Exercício em uso num treino não pode sair.
+  function excluirBase(id) {
+    if (treinosComBase(id).length) return 'em-uso';
+    var feito = db.registros.some(function (r) { return r.exercicios.some(function (x) { return x.baseId === id; }); })
+      || db.treinos.some(function (t) { return t.exercicios.some(function (e) { return e.baseId === id; }); }); // treinos arquivados
+    if (feito) base(id).arquivado = true; else db.exercicios = db.exercicios.filter(function (b) { return b.id !== id; });
+    salvar();
+    return feito ? 'arquivado' : 'excluido';
+  }
+  // Exercício de treino → id dele na biblioteca.
+  function baseDoExercicio(exId) {
+    for (var i = 0; i < db.treinos.length; i++) {
+      var e = buscar(db.treinos[i].exercicios, exId);
+      if (e) return e.baseId || null;
+    }
+    return null;
+  }
+  // Monta a biblioteca com os exercícios dos treinos que ainda não têm baseId (mesmo nome = mesmo exercício)
+  // e liga os registros antigos a ela.
+  function migrarBiblioteca() {
+    var mudou = false;
+    function porNome(nome, equipamento) {
+      var n = semAcento(nome);
+      return db.exercicios.filter(function (b) { return semAcento(b.nome) === n; })[0] || (mudou = true, novaBase(nome, null, equipamento));
+    }
+    db.treinos.forEach(function (t) {
+      t.exercicios.forEach(function (e) {
+        if (e.baseId && base(e.baseId)) return;
+        e.baseId = porNome(e.nome, e.equipamento).id;
+        mudou = true;
+      });
+    });
+    db.registros.forEach(function (r) {
+      r.exercicios.forEach(function (x) {
+        if (x.baseId && base(x.baseId)) return;
+        x.baseId = baseDoExercicio(x.exercicioId) || porNome(x.nome, x.semCarga ? 'corpo' : 'livre').id;
+        mudou = true;
+      });
+    });
+    if (mudou) gravarNoNavegador();
+  }
+  // Todos os resultados de um exercício da biblioteca (inclusive do treino em andamento), do mais antigo ao mais novo.
+  function resultadosDaBase(baseId) {
+    var l = [];
+    db.registros.forEach(function (r) {
+      r.exercicios.forEach(function (x) { if (x.baseId === baseId) l.push({ carga: x.carga, reps: x.reps, semCarga: !!x.semCarga, data: r.data, em: x.concluidoEm || r.inicio || 0, registroId: r.id }); });
+    });
+    return l.sort(function (a, b) { return a.data !== b.data ? (a.data < b.data ? -1 : 1) : a.em - b.em; });
+  }
+  // a é melhor que b? Com carga: mais carga e, na mesma carga, mais repetições. Peso do corpo: mais repetições.
+  function melhorQue(a, b) {
+    if (!b) return true;
+    if (a.semCarga || b.semCarga) return a.reps > b.reps;
+    return a.carga > b.carga + 1e-9 || (Math.abs(a.carga - b.carga) < 1e-9 && a.reps > b.reps);
+  }
+  function prDaBase(baseId, ignorar) {
+    var pr = null;
+    resultadosDaBase(baseId).forEach(function (x) { if (x !== ignorar && melhorQue(x, pr)) pr = x; });
+    return pr;
+  }
+
   // ---------- Registro dos treinos ----------
   function registro(id) { return buscar(db.registros, id); }
   function treinoEmAndamento() { return db.registros.filter(function (r) { return !r.fim; })[0] || null; }
@@ -273,19 +385,28 @@ var Dados = (function () {
     return r;
   }
   function feitoNoRegistro(r, exId) { return r ? buscar(r.exercicios.map(function (x) { return Object.assign({ id: x.exercicioId }, x); }), exId) : null; }
-  // Concluir um exercício: guarda carga e repetições da última série, e a carga vira a principal do próximo treino.
+  // Concluir um exercício: guarda carga e repetições da última série, e a carga vira a principal do próximo treino
+  // (em todos os treinos que usam o exercício). Devolve { item, novoPR, prAnterior, metas: metas de recorde batidas agora }.
   function concluirExercicio(registroId, exId, carga, reps) {
     var r = registro(registroId), e = exercicio(r.treinoId, exId);
-    var semCarga = !!(e && e.equipamento === 'corpo');
-    var item = { exercicioId: exId, nome: e ? e.nome : '', semCarga: semCarga, carga: semCarga ? 0 : numero(carga, 0, 1000, 0), reps: Math.round(numero(reps, 0, 999, 0)), concluidoEm: Date.now() };
+    var semCarga = !!(e && e.equipamento === 'corpo'), baseId = e ? e.baseId || null : null;
+    var item = { exercicioId: exId, baseId: baseId, nome: e ? e.nome : '', semCarga: semCarga, carga: semCarga ? 0 : numero(carga, 0, 1000, 0), reps: Math.round(numero(reps, 0, 999, 0)), concluidoEm: Date.now() };
     r.exercicios = r.exercicios.filter(function (x) { return x.exercicioId !== exId; }).concat([item]);
-    if (e && item.carga > 0) e.carga = item.carga;
+    // O PR anterior é o melhor resultado sem contar este.
+    var anterior = baseId ? resultadosDaBase(baseId).filter(function (x) { return !(x.registroId === r.id && x.em === item.concluidoEm); })
+      .reduce(function (m, x) { return melhorQue(x, m) ? x : m; }, null) : null;
+    if (item.carga > 0) {
+      if (e) e.carga = item.carga;
+      if (baseId) db.treinos.forEach(function (t) { t.exercicios.forEach(function (x) { if (x.baseId === baseId) x.carga = item.carga; }); });
+    }
+    var metas = sincronizarMetasPR();
     salvar();
-    return item;
+    return { item: item, novoPR: !!(baseId && anterior && melhorQue(Object.assign({}, item), anterior)), prAnterior: anterior, primeiro: !anterior, metas: metas };
   }
   function desfazerExercicio(registroId, exId) {
     var r = registro(registroId);
     r.exercicios = r.exercicios.filter(function (x) { return x.exercicioId !== exId; });
+    sincronizarMetasPR();
     salvar();
   }
   // Finaliza o treino. Devolve os nomes das metas de treino que este treino fez bater (as metas são calculadas).
@@ -299,14 +420,15 @@ var Dados = (function () {
     salvar();
     return antes.filter(function (h) { return progressoHabito(h, r.data).completo; }).map(function (h) { return h.titulo; });
   }
-  function cancelarTreino(registroId) { db.registros = db.registros.filter(function (r) { return r.id !== registroId; }); salvar(); }
+  function cancelarTreino(registroId) { db.registros = db.registros.filter(function (r) { return r.id !== registroId; }); sincronizarMetasPR(); salvar(); }
   function excluirRegistro(id) { cancelarTreino(id); }
   function duracaoSeg(r) { return Math.max(0, Math.round(((r.fim || Date.now()) - (r.inicio || Date.now())) / 1000)); }
   // Último resultado de um exercício em treinos já finalizados: { carga, reps, data }.
+  // Vale o mesmo exercício da biblioteca, mesmo que feito em outro treino.
   function ultimoResultado(exId) {
-    var h = historico();
+    var h = historico(), b = baseDoExercicio(exId);
     for (var i = 0; i < h.length; i++) {
-      var x = h[i].exercicios.filter(function (e) { return e.exercicioId === exId; })[0];
+      var x = h[i].exercicios.filter(function (e) { return e.exercicioId === exId || (b && e.baseId === b); })[0];
       if (x) return { carga: x.carga, reps: x.reps, semCarga: !!x.semCarga, data: h[i].data };
     }
     return null;
@@ -314,10 +436,11 @@ var Dados = (function () {
   var XP_TREINO = { base: 50, exercicio: 10 };
   function xpDoRegistro(r) { return XP_TREINO.base + XP_TREINO.exercicio * r.exercicios.length; }
   function xpDosTreinos(hoje) {
-    var r = { xp: 0, hoje: 0, feitos: 0 };
+    var r = { xp: 0, hoje: 0, feitos: 0, porMes: {} };
     historico().forEach(function (x) {
       var v = xpDoRegistro(x);
       r.xp += v; r.feitos++;
+      somarMes(r.porMes, x.data, v);
       if (x.data === hoje) r.hoje += v;
     });
     return r;
@@ -414,7 +537,7 @@ var Dados = (function () {
   }
   // Pontos da dieta: refeições seguidas, refeições não registradas (dias já encerrados) e o registro semanal.
   function xpDaDieta(hoje) {
-    var r = { xp: 0, hoje: 0, seguidas: 0, perdidas: 0, medidas: db.medidas.length };
+    var r = { xp: 0, hoje: 0, seguidas: 0, perdidas: 0, medidas: db.medidas.length, porMes: {} };
     var dias = {};
     Object.keys(db.alimentacao).forEach(function (d) { dias[d] = 1; });
     if (db.dieta.desde && db.dieta.refeicoes.length) {
@@ -423,10 +546,11 @@ var Dados = (function () {
     Object.keys(dias).forEach(function (d) {
       var s = resumoDieta(d, hoje);
       r.xp += s.xp; r.seguidas += s.dieta;
+      somarMes(r.porMes, d, s.xp);
       if (s.perdeu) r.perdidas += s.faltam;
       if (d === hoje) r.hoje += s.xp;
     });
-    db.medidas.forEach(function (m) { r.xp += XP_DIETA.medidas; if (m.data === hoje) r.hoje += XP_DIETA.medidas; });
+    db.medidas.forEach(function (m) { r.xp += XP_DIETA.medidas; somarMes(r.porMes, m.data, XP_DIETA.medidas); if (m.data === hoje) r.hoje += XP_DIETA.medidas; });
     return r;
   }
   // Adesão de uma semana (segunda a domingo) que contém o dia.
@@ -527,17 +651,57 @@ var Dados = (function () {
   function salvarMeta(campos, id) {
     var m = id ? meta(id) : null;
     if (!m) { m = { id: novoId(), criadoEm: Date.now(), concluida: false, dataConclusao: null }; db.metas.push(m); }
+    var eraPR = m.tipo === 'pr';
     m.titulo = texto(campos.titulo) || 'Meta';
     m.descricao = texto(campos.descricao);
     m.area = AREAS.some(function (a) { return a[0] === campos.area; }) ? campos.area : 'habitos';
     m.dificuldade = DIFICULDADES.some(function (d) { return d[0] === campos.dificuldade; }) ? campos.dificuldade : 'media';
     m.prazo = campos.prazo || null;
+    // Meta de recorde: batida sozinha quando um treino registra o exercício com a carga (e as repetições) do alvo.
+    if (campos.tipo === 'pr' && base(campos.exercicioId)) {
+      var b = base(campos.exercicioId);
+      m.tipo = 'pr';
+      m.area = 'treino';
+      m.exercicioId = b.id;
+      m.alvoCarga = b.equipamento === 'corpo' ? 0 : numero(campos.alvoCarga, 0, 1000, 0);
+      m.alvoReps = Math.max(1, Math.round(numero(campos.alvoReps, 1, 999, 1)));
+    } else {
+      m.tipo = 'livre';
+      delete m.exercicioId; delete m.alvoCarga; delete m.alvoReps;
+      if (eraPR) { m.concluida = false; m.dataConclusao = null; }
+    }
+    sincronizarMetasPR();
     salvar();
     return m;
   }
+  // Primeiro resultado que bate a meta de recorde (ou null).
+  function bateAlvo(m, x) {
+    var b = base(m.exercicioId), corpo = b ? b.equipamento === 'corpo' : x.semCarga;
+    return x.reps >= (m.alvoReps || 1) && (corpo || x.carga >= (m.alvoCarga || 0) - 1e-9);
+  }
+  function resultadoQueBateu(m) { return resultadosDaBase(m.exercicioId).filter(function (x) { return bateAlvo(m, x); })[0] || null; }
+  // Atualiza as metas de recorde a partir dos treinos. Devolve as que acabaram de ser batidas.
+  function sincronizarMetasPR() {
+    var novas = [];
+    db.metas.forEach(function (m) {
+      if (m.tipo !== 'pr') return;
+      var x = resultadoQueBateu(m), antes = !!m.concluida;
+      m.concluida = !!x;
+      m.dataConclusao = x ? x.data : null;
+      if (m.concluida && !antes) novas.push(m);
+    });
+    return novas;
+  }
+  // Progresso da meta de recorde: o PR atual comparado ao alvo.
+  function progressoMetaPR(m) {
+    var b = base(m.exercicioId), pr = b ? prDaBase(b.id) : null, corpo = b && b.equipamento === 'corpo';
+    var pct = !pr ? 0 : corpo ? pr.reps / (m.alvoReps || 1) * 100 : m.alvoCarga ? pr.carga / m.alvoCarga * 100 : 0;
+    if (m.concluida) pct = 100; else pct = Math.min(99, pct);
+    return { base: b, pr: pr, corpo: corpo, pct: pct };
+  }
   function concluirMeta(id, feita) {
     var m = meta(id);
-    if (!m) return;
+    if (!m || m.tipo === 'pr') return;
     m.concluida = feita !== false;
     m.dataConclusao = m.concluida ? UI.hoje() : null;
     salvar();
@@ -669,17 +833,93 @@ var Dados = (function () {
   }
   // XP das metas recorrentes: cada período cumprido (o atual conta assim que o alvo é atingido).
   function xpDosHabitos(hoje) {
-    var r = { xp: 0, hoje: 0, cumpridas: 0 };
+    var r = { xp: 0, hoje: 0, cumpridas: 0, porMes: {} };
     db.habitos.forEach(function (h) {
       var valor = xpDoHabito(h);
       periodosAteHoje(h).forEach(function (ini) {
         if (!progressoHabito(h, ini).completo) return;
         r.xp += valor; r.cumpridas++;
+        somarMes(r.porMes, mesDoPeriodo(h, ini), valor);
         if (ini === periodoDoHabito(h, hoje).inicio) r.hoje += valor;
       });
     });
     return r;
   }
+  // Mês a que um período pertence (a semana fica no mês do seu domingo). Devolve um dia desse mês.
+  function mesDoPeriodo(h, ini) { return h.periodo === 'semana' ? UI.somarDias(ini, 6) : ini; }
+
+  // ---------- Contador do mês e índice (multiplicador de XP) ----------
+  // [mínimo %, nome, multiplicador, id]
+  var FAIXAS_MES = [
+    [100, 'Lendário', 2, 'lendario'],
+    [90, 'Heroico', 1.5, 'heroico'],
+    [80, 'Valoroso', 1.25, 'valoroso'],
+    [75, 'Bronze', 1, 'bronze'],
+    [70, 'Ferro', 1, 'ferro'],
+    [0, 'Derrotado', 0.9, 'derrotado']
+  ].map(function (f) { return { min: f[0], nome: f[1], mult: f[2], id: f[3] }; });
+  function faixaDoPct(pct) {
+    if (pct == null) return null;
+    for (var i = 0; i < FAIXAS_MES.length; i++) if (pct >= FAIXAS_MES[i].min - 1e-9) return FAIXAS_MES[i];
+    return FAIXAS_MES[FAIXAS_MES.length - 1];
+  }
+  var cacheMes = {};
+  // Cada ocorrência de meta no mês: cada dia de uma meta diária, cada semana (pelo domingo) de uma semanal,
+  // o mês de uma mensal e as metas de longo prazo com prazo (ou concluídas) no mês.
+  // batida | falhou (o período acabou sem cumprir) | falta (ainda vai acontecer ou está em curso).
+  // O índice usa as já decididas: batidas / (batidas + falharam).
+  function resumoDoMes(mes, hoje) {
+    hoje = hoje || UI.hoje();
+    var chave = mes + '|' + hoje + '|' + (window.Estudos ? Estudos.info().lidoEm || 0 : 0);
+    if (cacheMes[mes] && cacheMes[mes].chave === chave) return cacheMes[mes].r;
+    var ini = mes + '-01', fim = mes + '-' + UI.pad(diasNoMes(mes));
+    var r = { mes: mes, total: 0, batidas: 0, falharam: 0, faltam: 0, porArea: {} };
+    function contar(area, estado) {
+      r.total++;
+      r[estado === 'batida' ? 'batidas' : estado === 'falhou' ? 'falharam' : 'faltam']++;
+      var a = r.porArea[area] || (r.porArea[area] = { total: 0, batidas: 0, falharam: 0, faltam: 0 });
+      a.total++; a[estado === 'batida' ? 'batidas' : estado === 'falhou' ? 'falharam' : 'faltam']++;
+    }
+    function estado(h, pIni, pFim) {
+      if (pIni > hoje) return 'falta';
+      var ok = progressoHabito(h, pIni).completo;
+      return ok ? 'batida' : pFim < hoje ? 'falhou' : 'falta';
+    }
+    db.habitos.forEach(function (h) {
+      var desde = h.desde || ini;
+      if (h.periodo === 'dia') {
+        for (var d = ini; d <= fim; d = UI.somarDias(d, 1)) {
+          if (d < desde || !habitoValeNoDia(h, d)) continue;
+          contar(h.area, estado(h, d, d));
+        }
+      } else if (h.periodo === 'semana') {
+        var seg = UI.somarDias(ini, -diaDaSemana(ini));
+        if (UI.somarDias(seg, 6) < ini) seg = UI.somarDias(seg, 7);
+        for (; UI.somarDias(seg, 6) <= fim; seg = UI.somarDias(seg, 7)) {
+          var dom = UI.somarDias(seg, 6), est = estado(h, seg, dom);
+          // Semana pela metade (a meta foi criada no meio dela) não conta como falha.
+          if (dom < desde || (seg < desde && est === 'falhou')) continue;
+          contar(h.area, est);
+        }
+      } else if (fim >= desde) {
+        var estMes = estado(h, ini, fim);
+        if (ini >= desde || estMes !== 'falhou') contar(h.area, estMes); // mês pela metade não conta como falha
+      }
+    });
+    db.metas.forEach(function (m) {
+      var data = m.concluida ? m.dataConclusao : m.prazo;
+      if (!data || data.slice(0, 7) !== mes) return;
+      var area = m.tipo === 'pr' ? 'pr' : m.area === 'estudos' ? 'estudo' : m.area === 'habitos' ? 'habito' : m.area;
+      contar(area, m.concluida ? 'batida' : m.prazo < hoje ? 'falhou' : 'falta');
+    });
+    var decididas = r.batidas + r.falharam;
+    r.pct = decididas ? r.batidas / decididas * 100 : null;
+    r.faixa = faixaDoPct(r.pct);
+    r.multiplicador = r.faixa ? r.faixa.mult : 1;
+    cacheMes[mes] = { chave: chave, r: r };
+    return r;
+  }
+
   // Para o Dashboard: metas cumpridas sobre as possíveis numa semana (diárias: cada dia; semanais: a semana).
   function cumprimentoNaSemana(seg) {
     var hoje = UI.hoje(), r = { feitas: 0, possiveis: 0 };
@@ -700,6 +940,8 @@ var Dados = (function () {
     r.pct = r.possiveis ? Math.round(r.feitas / r.possiveis * 100) : null;
     return r;
   }
+
+  preparar();
 
   return {
     get db() { return db; },
@@ -726,6 +968,9 @@ var Dados = (function () {
     DIFICULDADE_HABITO: DIFICULDADE_HABITO, medidaHabito: medidaHabito, xpDoHabito: xpDoHabito, habitoCumpridoNoDia: habitoCumpridoNoDia,
     cumprimentoNaSemana: cumprimentoNaSemana, habito: habito, habitos: habitos, salvarHabito: salvarHabito, excluirHabito: excluirHabito,
     marcarHabito: marcarHabito, habitoValeNoDia: habitoValeNoDia, progressoHabito: progressoHabito, sequenciaHabito: sequenciaHabito,
-    xpDosHabitos: xpDosHabitos, diaDaSemana: diaDaSemana
+    xpDosHabitos: xpDosHabitos, diaDaSemana: diaDaSemana,
+    GRUPOS: GRUPOS, base: base, biblioteca: biblioteca, salvarBase: salvarBase, excluirBase: excluirBase, treinosComBase: treinosComBase,
+    baseDoExercicio: baseDoExercicio, resultadosDaBase: resultadosDaBase, prDaBase: prDaBase, progressoMetaPR: progressoMetaPR,
+    FAIXAS_MES: FAIXAS_MES, faixaDoPct: faixaDoPct, resumoDoMes: resumoDoMes
   };
 })();

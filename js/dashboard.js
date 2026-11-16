@@ -136,32 +136,28 @@ var Dashboard = (function () {
     ]);
   }
 
-  // Evolução das cargas: primeiro e último resultado de cada exercício.
+  // Evolução das cargas: primeiro e último resultado e o recorde (PR) de cada exercício da biblioteca.
   function progressoExercicios() {
-    var linhas = [];
-    Dados.treinos().forEach(function (t) {
-      Dados.exercicios(t.id).forEach(function (e) {
-        var hist = Dados.historico().slice().reverse(), primeiro = null, ultimo = null, vezes = 0;
-        hist.forEach(function (r) {
-          var x = r.exercicios.filter(function (y) { return y.exercicioId === e.id; })[0];
-          if (!x) return;
-          vezes++;
-          if (!primeiro) primeiro = { x: x, data: r.data };
-          ultimo = { x: x, data: r.data };
-        });
-        if (primeiro) linhas.push({ treino: t.nome, e: e, primeiro: primeiro, ultimo: ultimo, vezes: vezes });
+    var linhas = [], finalizados = {};
+    Dados.historico().forEach(function (r) { finalizados[r.id] = 1; });
+    Dados.GRUPOS.forEach(function (g) {
+      Dados.biblioteca(g[0], true).forEach(function (b) {
+        var res = Dados.resultadosDaBase(b.id).filter(function (x) { return finalizados[x.registroId]; });
+        if (!res.length) return;
+        linhas.push({ b: b, grupo: g[1], primeiro: { x: res[0] }, ultimo: { x: res[res.length - 1] }, pr: Dados.prDaBase(b.id), vezes: res.length });
       });
     });
     if (!linhas.length) return el('p', { class: 'modal-desc', text: 'Aparece aqui depois dos primeiros treinos registrados.' });
     function res(x) { return x.semCarga ? x.reps + ' reps' : fmt(x.carga) + ' kg × ' + x.reps; }
     return el('div', { class: 'tabela-rolagem' }, el('table', { class: 'tabela-evolucao tabela-dash' }, [
-      el('thead', null, el('tr', null, ['Exercício', 'Primeiro', 'Último', 'Evolução', 'Vezes'].map(function (c) { return el('th', { text: c }); }))),
+      el('thead', null, el('tr', null, ['Exercício', 'Primeiro', 'Último', 'PR', 'Evolução', 'Vezes'].map(function (c) { return el('th', { text: c }); }))),
       el('tbody', null, linhas.map(function (l) {
         var semCarga = l.ultimo.x.semCarga, d = semCarga ? l.ultimo.x.reps - l.primeiro.x.reps : l.ultimo.x.carga - l.primeiro.x.carga;
         return el('tr', null, [
-          el('td', null, [el('strong', { text: l.e.nome }), el('small', { class: 'dif', text: l.treino })]),
+          el('td', null, [el('strong', { text: l.b.nome }), el('small', { class: 'dif', text: l.grupo })]),
           el('td', { text: res(l.primeiro.x) }),
           el('td', { text: res(l.ultimo.x) }),
+          el('td', { text: l.pr ? res(l.pr) : '—' }),
           el('td', { class: d > 0 ? 'positivo' : d < 0 ? 'negativo' : 'neutro', text: (d > 0 ? '+' : d < 0 ? '−' : '') + fmt(Math.abs(d)) + (semCarga ? ' reps' : ' kg') }),
           el('td', { text: String(l.vezes) })
         ]);
@@ -187,6 +183,7 @@ var Dashboard = (function () {
     var detalheDieta = dAtual.total ? dAtual.dieta + ' de ' + dAtual.total + ' refeições' + (dAtual.faltam ? ' · ' + dAtual.faltam + ' sem registro' : '') + (vD.texto ? ' · ' + vD.texto : '') : 'sem plano';
     raiz.appendChild(el('div', { class: 'grade-kpi' }, [
       kpi('Patente', p.patente.nome, UI.fmtNum(p.xp) + ' XP' + (p.proxima ? ' · faltam ' + UI.fmtNum(p.falta) : '')),
+      kpi('Índice do mês', p.mesAtual.faixa ? p.mesAtual.faixa.nome : '—', p.mesAtual.faixa ? Math.floor(p.mesAtual.pct) + '% · ' + p.mesAtual.batidas + ' batidas, ' + p.mesAtual.falharam + ' falharam · XP ×' + String(p.mesAtual.multiplicador).replace('.', ',') : 'sem metas decididas'),
       kpi('Treinos na semana', String(tAtual), vT.texto, vT.classe),
       kpi('Dieta na semana', dAtual.pct == null ? '—' : dAtual.pct + '%', detalheDieta, vD.classe),
       kpi('Metas recorrentes', mAtual.pct == null ? '—' : mAtual.pct + '%', mAtual.possiveis ? mAtual.feitas + ' de ' + mAtual.possiveis + (vM.texto ? ' · ' + vM.texto : '') : 'nenhuma meta', vM.classe),

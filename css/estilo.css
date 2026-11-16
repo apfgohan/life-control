@@ -687,7 +687,7 @@ h1, h2, p { margin: 0; }
 .tabela-evolucao td small.dif { display: block; font-size: 11px; color: var(--texto-3); font-weight: 600; }
 
 /* ---------- Dashboard ---------- */
-.grade-kpi { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.grade-kpi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
 .kpi-rotulo { font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .04em; }
 .kpi-valor { font-size: 24px; font-weight: 800; line-height: 1.2; }
 .kpi-detalhe { font-size: 12px; font-weight: 700; color: var(--texto-3); }
@@ -717,7 +717,6 @@ h1, h2, p { margin: 0; }
 /* ---------- Telas menores ---------- */
 @media (max-width: 1100px) {
   .grade-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grade-kpi .kpi:first-child { grid-column: 1 / -1; }
   .cartoes-evolucao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
@@ -760,3 +759,81 @@ h1, h2, p { margin: 0; }
   .treino-cartao-acoes { margin-left: auto; }
 }
 
+
+/* ---------- Símbolos das metas (ícone em círculo com a cor da área) ---------- */
+.simbolo-meta { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: 1px solid; }
+.simbolo-meta .icone { width: 17px; height: 17px; }
+.meta .simbolo-meta { width: 40px; height: 40px; }
+.meta .simbolo-meta .icone { width: 20px; height: 20px; }
+.simbolo-estudo { background: var(--azul-claro); border-color: var(--azul-borda); color: var(--azul-escuro); }
+.simbolo-treino { background: var(--laranja-claro); border-color: var(--laranja-borda); color: var(--laranja-texto); }
+.simbolo-dieta { background: var(--verde-claro); border-color: var(--verde-borda); color: var(--verde-texto); }
+.simbolo-habito { background: var(--roxo-claro); border-color: var(--roxo-borda); color: var(--roxo-texto); }
+.simbolo-pr { background: var(--amarelo-claro); border-color: var(--amarelo-borda); color: var(--ouro); }
+.habito.area-treino .habito-area { background: var(--laranja-claro); color: var(--laranja-texto); }
+.habito.area-habito .habito-area { background: var(--roxo-claro); color: var(--roxo-texto); }
+.meta-pr { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--texto-2); }
+
+/* ---------- Contador do mês ---------- */
+.painel-mes { --cor-faixa: var(--borda-forte); --cor-faixa-claro: var(--superficie-2); border-left: 5px solid var(--cor-faixa); }
+.faixa-lendario { --cor-faixa: var(--ouro); --cor-faixa-claro: var(--amarelo-claro); }
+.faixa-heroico { --cor-faixa: var(--roxo-texto); --cor-faixa-claro: var(--roxo-claro); }
+.faixa-valoroso { --cor-faixa: var(--azul-escuro); --cor-faixa-claro: var(--azul-claro); }
+.faixa-bronze { --cor-faixa: #d39462; --cor-faixa-claro: #2f2117; }
+.faixa-ferro { --cor-faixa: #a9b1c4; --cor-faixa-claro: #22262f; }
+.faixa-derrotado { --cor-faixa: var(--vermelho); --cor-faixa-claro: var(--vermelho-claro); }
+.painel-mes .secao-titulo .icone { color: var(--texto-2); }
+.mes-corpo { display: grid; grid-template-columns: minmax(220px, auto) 1fr; gap: 14px 22px; align-items: center; }
+.mes-indice { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: var(--cor-faixa-claro); border: 1px solid var(--borda); }
+.mes-escudo { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; color: var(--cor-faixa); }
+.mes-escudo .icone { width: 34px; height: 34px; }
+.mes-escudo svg { fill: currentColor; fill-opacity: .18; }
+.mes-indice-texto { display: flex; flex-direction: column; gap: 2px; }
+.mes-faixa { font-size: 20px; font-weight: 800; color: var(--cor-faixa); }
+.mes-indice-texto span { font-size: 13px; font-weight: 600; color: var(--texto-2); }
+.mes-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.mes-numero { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--superficie-2); border: 1px solid var(--borda); }
+.mes-numero strong { font-size: 24px; font-weight: 800; line-height: 1.1; }
+.mes-numero span { font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .04em; }
+.mes-numero.positivo strong { color: var(--verde-texto); }
+.mes-numero.negativo strong { color: var(--vermelho); }
+.mes-barra { grid-column: 1 / -1; display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden; background: var(--superficie-2); }
+.mes-seg { min-width: 4px; }
+.seg-batidas { background: var(--verde); }
+.seg-falharam { background: var(--vermelho); }
+.seg-faltam { background: var(--borda-forte); }
+.mes-dica { grid-column: 1 / -1; margin: 0; font-size: 13px; font-weight: 600; color: var(--texto-2); }
+.faixas-mes { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.faixa-linha { display: grid; grid-template-columns: 36px 1fr auto auto; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 12px; border: 1px solid var(--borda); background: var(--superficie-2); }
+.faixa-linha .mes-escudo { width: 36px; height: 36px; }
+.faixa-linha .mes-escudo .icone { width: 26px; height: 26px; }
+.faixa-linha strong { color: var(--cor-faixa); }
+.faixa-linha.atual { border-color: var(--cor-faixa); background: var(--cor-faixa-claro); }
+.faixa-pct { font-size: 13px; color: var(--texto-2); font-weight: 600; }
+.faixa-mult { font-weight: 800; min-width: 48px; text-align: right; }
+
+/* ---------- Biblioteca de exercícios e PR ---------- */
+.biblioteca-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.biblioteca-grupo { display: flex; flex-direction: column; gap: 8px; }
+.lista-biblioteca { display: flex; flex-direction: column; gap: 6px; }
+.painel > .segmentado { margin-bottom: 14px; }
+.biblioteca-linha { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie-2); color: var(--texto); text-align: left; cursor: pointer; }
+.biblioteca-linha:hover { border-color: var(--borda-forte); }
+.biblioteca-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.biblioteca-pr { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-weight: 800; font-size: 13px; color: var(--ouro); }
+.biblioteca-pr .icone { width: 16px; height: 16px; }
+.biblioteca-pr.vazio-pr { color: var(--texto-3); }
+.resultado-pr { background: var(--superficie-2); border-color: var(--borda); }
+.resultado-pr span { color: var(--ouro); display: inline-flex; align-items: center; gap: 4px; }
+.resultado-pr .icone { width: 14px; height: 14px; }
+.parabens-meta { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--verde-claro); border: 1px solid var(--verde-borda); color: var(--verde-texto); font-weight: 700; }
+.bloco-pr { display: flex; flex-direction: column; gap: 12px; }
+
+@media (max-width: 700px) {
+  .mes-corpo { grid-template-columns: 1fr; }
+  .mes-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .meta .simbolo-meta { width: 34px; height: 34px; }
+  .habito .simbolo-meta { width: 28px; height: 28px; }
+  .habito .simbolo-meta .icone { width: 14px; height: 14px; }
+  .habito { gap: 9px; }
+}

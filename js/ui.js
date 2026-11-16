@@ -76,7 +76,8 @@ var UI = (function () {
     lixo: '<polyline points="4 7 20 7"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
     anterior: '<polyline points="15 6 9 12 15 18"/>',
     proximo: '<polyline points="9 6 15 12 9 18"/>',
-    trofeu: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5v1a3 3 0 0 0 3 3"/><path d="M16 6h3v1a3 3 0 0 1-3 3"/><line x1="12" y1="13" x2="12" y2="17"/><path d="M8.5 20h7l-1-3h-5z"/>'
+    trofeu: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5v1a3 3 0 0 0 3 3"/><path d="M16 6h3v1a3 3 0 0 1-3 3"/><line x1="12" y1="13" x2="12" y2="17"/><path d="M8.5 20h7l-1-3h-5z"/>',
+    brilho: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>'
   };
 
   function icone(nome, classe) {
@@ -84,6 +85,14 @@ var UI = (function () {
       class: 'icone ' + (classe || ''),
       html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + caminhos[nome] + '</svg>'
     });
+  }
+
+  // Símbolo do tipo de meta: ícone num círculo com a cor da área (estudo, treino, dieta, hábito ou recorde).
+  var SIMBOLOS = { estudo: ['livro', 'Estudo'], estudos: ['livro', 'Estudo'], treino: ['halter', 'Treino'], dieta: ['prato', 'Dieta'],
+    habito: ['brilho', 'Hábito'], habitos: ['brilho', 'Hábito'], pr: ['trofeu', 'Recorde (PR)'] };
+  function simboloMeta(area) {
+    var s = SIMBOLOS[area] || SIMBOLOS.habito, chave = area === 'estudos' ? 'estudo' : area === 'habitos' ? 'habito' : SIMBOLOS[area] ? area : 'habito';
+    return el('span', { class: 'simbolo-meta simbolo-' + chave, title: s[1] }, icone(s[0]));
   }
 
   // ---------- Datas e números ----------
@@ -303,7 +312,7 @@ var UI = (function () {
   }
 
   return {
-    el: el, icone: icone,
+    el: el, icone: icone, simboloMeta: simboloMeta,
     hoje: hoje, somarDias: somarDias, diasEntre: diasEntre, fmtData: fmtData, haQuanto: haQuanto,
     fmtPct: fmtPct, fmtNum: fmtNum, fmtDuracao: fmtDuracao, pad: pad,
     lerTempo: lerTempo, fmtTempo: fmtTempo, campoTempo: campoTempo,
