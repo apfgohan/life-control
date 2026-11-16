@@ -181,9 +181,12 @@ var Metas = (function () {
   function render(raiz) {
     var r = Patentes.calcular(), todas = Dados.db.metas;
     var daArea = todas.filter(function (m) { return area === 'todas' || m.area === area; });
+    // Da mais fácil para a mais difícil e, dentro da mesma dificuldade, em ordem alfabética.
+    var ordemDif = {};
+    Dados.DIFICULDADES.forEach(function (d, i) { ordemDif[d[0]] = i; });
     var abertas = daArea.filter(function (m) { return !m.concluida; }).sort(function (a, b) {
-      var x = a.prazo || '9999', y = b.prazo || '9999';
-      return x !== y ? (x < y ? -1 : 1) : (a.criadoEm || 0) - (b.criadoEm || 0);
+      var da = ordemDif[a.dificuldade] != null ? ordemDif[a.dificuldade] : 1, dbb = ordemDif[b.dificuldade] != null ? ordemDif[b.dificuldade] : 1;
+      return da - dbb || a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true, sensitivity: 'base' });
     });
     var concluidas = daArea.filter(function (m) { return m.concluida; }).sort(function (a, b) { return (b.dataConclusao || '') < (a.dataConclusao || '') ? -1 : 1; });
 

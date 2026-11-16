@@ -218,12 +218,13 @@ var Habitos = (function () {
       ]),
       todas.length ? filtros : null,
       avisoEstudos(lista),
-      lista.length ? el('div', { class: 'habitos-colunas' }, Dados.PERIODOS.map(function (p) {
-        var doPeriodo = lista.filter(function (h) { return h.periodo === p[0]; });
-        if (!doPeriodo.length) return null;
+      // Agrupadas por tipo (área); dentro de cada uma, diárias, semanais e depois mensais.
+      lista.length ? el('div', { class: 'habitos-colunas' }, Dados.AREAS_HABITO.map(function (a) {
+        var doTipo = lista.filter(function (h) { return h.area === a[0]; });
+        if (!doTipo.length) return null;
         return el('div', { class: 'habitos-grupo' }, [
-          el('div', { class: 'habitos-grupo-titulo', text: p[1] + 's · ' + Dados.XP_PERIODO[p[0]] + ' XP base' }),
-          el('div', { class: 'lista-habitos' }, doPeriodo.map(function (h) {
+          el('div', { class: 'habitos-grupo-titulo titulo-tipo' }, [UI.simboloMeta(a[0]), a[1], el('span', { class: 'secao-contagem', text: doTipo.length })]),
+          el('div', { class: 'lista-habitos' }, doTipo.map(function (h) {
             if (Dados.habitoValeNoDia(h, hoje)) return linha(h, hoje);
             return el('div', { class: 'habito inativo' }, [
               el('span', { class: 'btn-check desligado', title: 'Não vale hoje' }),
