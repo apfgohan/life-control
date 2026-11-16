@@ -22,6 +22,7 @@ var Configuracoes = (function () {
   function painelPerfil() {
     var p = Dados.db.perfil;
     var nome = el('input', { type: 'text', value: p.nome || '', placeholder: 'Seu nome', maxLength: 60 });
+    var inicio = el('input', { type: 'date', value: Dados.inicioProjeto() });
     var arquivo = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: function () {
       if (arquivo.files[0]) reduzirFoto(arquivo.files[0], function (url) { Dados.atualizarPerfil({ foto: url }); App.atualizar(); });
     } });
@@ -30,9 +31,9 @@ var Configuracoes = (function () {
       el('div', { class: 'perfil-edicao' }, [
         App.fotoPerfil(p),
         el('div', { class: 'perfil-campos' }, [
-          UI.campo('Nome', nome),
+          el('div', { class: 'campos-linha' }, [UI.campo('Nome', nome), UI.campo('Início do projeto', inicio, 'A Página Inicial conta os dias a partir desta data.')]),
           el('div', { class: 'pasta-acoes' }, [
-            UI.botao('Salvar nome', function () { Dados.atualizarPerfil({ nome: nome.value }); App.atualizar(); UI.aviso('Perfil salvo'); }, 'btn-primario'),
+            UI.botao('Salvar', function () { Dados.atualizarPerfil({ nome: nome.value, inicio: inicio.value }); App.atualizar(); UI.aviso('Perfil salvo'); }, 'btn-primario'),
             UI.botao('Trocar foto…', function () { arquivo.click(); }, 'btn-secundario'),
             p.foto ? UI.botao('Remover foto', function () { Dados.atualizarPerfil({ foto: null }); App.atualizar(); }, 'btn-contorno') : null,
             arquivo

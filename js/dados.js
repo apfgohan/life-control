@@ -152,7 +152,13 @@ var Dados = (function () {
   function diasNoMes(mes) { var p = mes.split('-'); return new Date(Number(p[0]), Number(p[1]), 0).getDate(); }
 
   // ---------- Perfil ----------
+  // Início do projeto (quando a rotina começou a valer); muda em Configurações.
+  var INICIO_PADRAO = '2026-11-16';
+  function inicioProjeto() { return db.perfil.inicio || INICIO_PADRAO; }
+  // Dia do projeto: 1 no dia do início. Antes dele, negativo/zero (quantos dias faltam).
+  function diaDoProjeto(hoje) { return UI.diasEntre(inicioProjeto(), hoje || UI.hoje()) + 1; }
   function atualizarPerfil(campos) {
+    if (campos.inicio !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(campos.inicio || '')) db.perfil.inicio = campos.inicio;
     if (campos.nome != null) db.perfil.nome = texto(campos.nome);
     if (campos.foto !== undefined) db.perfil.foto = campos.foto || null;
     db.configurado = true;
@@ -986,7 +992,7 @@ var Dados = (function () {
   return {
     get db() { return db; },
     salvar: salvar, substituir: substituir, exportar: exportar, importar: importar, limpar: limpar, semDados: semDados, ehDoPrograma: ehDoPrograma,
-    atualizarPerfil: atualizarPerfil,
+    atualizarPerfil: atualizarPerfil, inicioProjeto: inicioProjeto, diaDoProjeto: diaDoProjeto,
     TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, seriesPadrao: seriesPadrao, padraoSerie: padraoSerie, salvarPadroesSerie: salvarPadroesSerie, restaurarPadroesSerie: restaurarPadroesSerie, faixaValida: faixaValida, passouDaFaixa: passouDaFaixa, EQUIPAMENTOS: EQUIPAMENTOS, PASSO_MAQUINA: PASSO_MAQUINA,
     treino: treino, treinos: treinos, salvarTreino: salvarTreino, excluirTreino: excluirTreino, moverTreino: moverTreino,
     exercicio: exercicio, exercicios: exercicios, salvarExercicio: salvarExercicio, excluirExercicio: excluirExercicio, moverExercicio: moverExercicio,

@@ -22,10 +22,24 @@ var Inicio = (function () {
     var h = new Date().getHours(), nome = (Dados.db.perfil.nome || '').split(' ')[0];
     var s = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
     var d = new Date(), dias = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
-    return el('div', { class: 'pagina-topo' }, el('div', null, [
-      el('h1', { class: 'pagina-titulo', text: s + (nome ? ', ' + nome : '') }),
-      el('div', { class: 'pagina-subtitulo', text: dias[d.getDay()].charAt(0).toUpperCase() + dias[d.getDay()].slice(1) + ', ' + UI.fmtData(UI.hoje()) })
-    ]));
+    return el('div', { class: 'pagina-topo' }, [
+      el('div', null, [
+        el('h1', { class: 'pagina-titulo', text: s + (nome ? ', ' + nome : '') }),
+        el('div', { class: 'pagina-subtitulo', text: dias[d.getDay()].charAt(0).toUpperCase() + dias[d.getDay()].slice(1) + ', ' + UI.fmtData(UI.hoje()) })
+      ]),
+      seloProjeto()
+    ]);
+  }
+
+  // "Dia 12 do projeto · desde 16/11/2026" (antes do início: quantos dias faltam).
+  function seloProjeto() {
+    var n = Dados.diaDoProjeto(), inicio = Dados.inicioProjeto();
+    var grande = n >= 1 ? 'Dia ' + n : n === 0 ? 'Amanhã' : 'Em ' + (1 - n) + ' dias';
+    var texto = n >= 1 ? 'do projeto · desde ' + UI.fmtData(inicio) : 'começa o projeto · ' + UI.fmtData(inicio);
+    return el('a', { class: 'selo-projeto', href: '#/configuracoes', title: 'Início do projeto (muda em Configurações)' }, [
+      UI.icone('calendario'),
+      el('span', { class: 'selo-projeto-texto' }, [el('strong', { text: grande }), el('span', { text: texto })])
+    ]);
   }
 
   // Contador do mês: metas (cada ocorrência) batidas, que falharam e que faltam, e o índice que multiplica o XP do mês.
@@ -92,6 +106,7 @@ var Inicio = (function () {
 
   function render(raiz) {
     raiz.appendChild(saudacao());
+    raiz.appendChild(Frases.painel());
     raiz.appendChild(painelAvisos());
     raiz.appendChild(painelMes());
     var semanal = Dieta.painelPendente();
