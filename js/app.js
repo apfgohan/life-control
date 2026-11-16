@@ -110,11 +110,17 @@ var App = (function () {
 
   // ---------- Versão nova publicada ----------
   // Uma aba aberta continua com os arquivos antigos até ser recarregada: confere o versao.json de tempos em tempos.
+  // A versão carregada vem do "?v=" do próprio app.js (o mesmo número que a publicação troca), para nunca ficar
+  // diferente do versao.json por esquecimento.
   var avisoVersao = null;
+  var VERSAO_CARREGADA = (function () {
+    var s = document.querySelector('script[src*="js/app.js"]'), m = s && s.getAttribute('src').match(/[?&]v=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : window.VERSAO_APP;
+  })();
   function conferirVersao() {
-    if (!window.VERSAO_APP || !/^https?:$/.test(location.protocol) || avisoVersao) return;
+    if (!VERSAO_CARREGADA || !/^https?:$/.test(location.protocol) || avisoVersao) return;
     fetch('versao.json?_=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
-      if (!v || !v.versao || v.versao === window.VERSAO_APP || avisoVersao) return;
+      if (!v || !v.versao || v.versao === VERSAO_CARREGADA || avisoVersao) return;
       avisoVersao = UI.el('div', { class: 'aviso-versao' }, [
         UI.el('span', { text: 'Há uma versão nova do programa.' }),
         UI.botao('Atualizar agora', function () { location.reload(); }, 'btn-primario')
