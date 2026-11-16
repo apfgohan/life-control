@@ -73,24 +73,10 @@ var Patentes = (function () {
     return r;
   }
 
-  // ---------- Insígnia: escudo com a cor do grupo e marcas que aumentam dentro do grupo ----------
-  var CORES = {
-    povo: ['#8b6f4e', '#c9a77c'], armas: ['#6f7b91', '#c3cbdb'], cavalaria: ['#2a74d6', '#9cc8ff'],
-    nobreza: ['#7a4fd0', '#d3bcff'], realeza: ['#c9941f', '#ffe08a']
-  };
+  // ---------- Insígnia: o retrato do personagem da patente (js/retratos.js) ----------
   function insignia(indice, classe) {
-    var p = LISTA[indice] || LISTA[0], cor = CORES[p.grupo];
-    var posicao = LISTA.slice(0, indice).filter(function (x) { return x.grupo === p.grupo; }).length; // 0, 1, 2… dentro do grupo
-    var marcas = '';
-    for (var i = 0; i <= posicao && i < 4; i++) {
-      var y = 21 - i * 4.2;
-      marcas += '<polyline points="10.5 ' + y + ' 16 ' + (y - 3.2) + ' 21.5 ' + y + '" fill="none" stroke="' + cor[1] + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>';
-    }
-    var coroa = p.grupo === 'nobreza' || p.grupo === 'realeza'
-      ? '<path d="M10.5 6.8l2.2 1.9 3.3-3.4 3.3 3.4 2.2-1.9-.8 4.4h-9.4z" fill="' + cor[1] + '"/>' : '';
-    var estrela = p.grupo === 'cavalaria' ? '<circle cx="16" cy="8.2" r="1.7" fill="' + cor[1] + '"/>' : '';
-    var svg = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5l11 4v8.6c0 6.6-4.5 11.6-11 14.4C9.5 26.700 5 21.700 5 15.100V6.500z" fill="' + cor[0] + '" stroke="' + cor[1] + '" stroke-width="1.6" stroke-linejoin="round"/>' + coroa + estrela + marcas + '</svg>';
-    return el('span', { class: 'insignia grupo-' + p.grupo + ' ' + (classe || ''), title: p.nome, html: svg });
+    var p = LISTA[indice] || LISTA[0];
+    return el('span', { class: 'insignia grupo-' + p.grupo + ' ' + (classe || ''), title: p.nome, role: 'img', 'aria-label': p.nome, html: Retratos.svg(p.indice) });
   }
 
   // ---------- Tela "Minha patente" ----------
