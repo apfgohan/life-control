@@ -139,6 +139,13 @@ var Dieta = (function () {
       Promise.all(tarefas).then(function () {
         var salvo = Dados.salvarMedida(valores, m ? m.id : null);
         var faltaFoto = ANGULOS.filter(function (a) { return !salvo.fotos[a[0]]; }).length;
+        var batidas = Dados.metasRecemBatidas();
+        if (batidas.length) setTimeout(function () {
+          UI.modal('Meta batida!', el('div', { class: 'promocao' }, [
+            el('div', { class: 'parabens-icone' }, UI.icone('trofeu')),
+            batidas.map(function (x) { return el('p', { class: 'parabens-meta', text: x.titulo + ' · +' + UI.fmtNum(Dados.xpDaMeta(x)) + ' XP' }); })
+          ]), [{ texto: 'Continuar', classe: 'btn-primario' }]);
+        }, 0);
         UI.aviso('Registro semanal salvo' + (m ? '' : ' · +' + Dados.XP_DIETA.medidas + ' XP') + (faltaFoto ? ' · faltam ' + faltaFoto + (faltaFoto > 1 ? ' fotos' : ' foto') : ''));
         App.atualizar();
       });

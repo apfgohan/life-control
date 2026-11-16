@@ -769,7 +769,8 @@ h1, h2, p { margin: 0; }
 .simbolo-treino { background: var(--laranja-claro); border-color: var(--laranja-borda); color: var(--laranja-texto); }
 .simbolo-dieta { background: var(--verde-claro); border-color: var(--verde-borda); color: var(--verde-texto); }
 .simbolo-habito { background: var(--roxo-claro); border-color: var(--roxo-borda); color: var(--roxo-texto); }
-.simbolo-pr { background: var(--amarelo-claro); border-color: var(--amarelo-borda); color: var(--ouro); }
+.simbolo-medida { background: var(--teal-claro); border-color: var(--teal-borda); color: var(--teal); }
+.simbolo-pr {background: var(--amarelo-claro); border-color: var(--amarelo-borda); color: var(--ouro); }
 .habito.area-treino .habito-area { background: var(--laranja-claro); color: var(--laranja-texto); }
 .habito.area-habito .habito-area { background: var(--roxo-claro); color: var(--roxo-texto); }
 .meta-pr { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--texto-2); }

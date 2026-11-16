@@ -17,7 +17,7 @@ var Metas = (function () {
 
   function editar(id, areaPadrao) {
     var m = id ? Dados.meta(id) : null;
-    var tipo = m && m.tipo === 'pr' ? 'pr' : 'livre';
+    var tipo = m && (m.tipo === 'pr' || m.tipo === 'medida') ? m.tipo : 'livre';
     var titulo = el('input', { type: 'text', value: m ? m.titulo : '', placeholder: 'Ex.: Correr 10 km', maxLength: 120 });
     var descricao = el('textarea', { rows: 3, value: m ? m.descricao : '', placeholder: 'Como você vai saber que concluiu? (opcional)' });
     var selArea = el('select', null, Dados.AREAS.map(function (a) { return el('option', { value: a[0], text: a[1], selected: (m ? m.area : (areaPadrao || 'habitos')) === a[0] }); }));
@@ -43,10 +43,40 @@ var Metas = (function () {
     ]);
     var campoArea = UI.campo('Área', selArea);
 
+    // Campos da meta de medida (peso, braço, coxa, panturrilha)
+    var selCampo = el('select', null, Dados.CAMPOS_MEDIDA.map(function (c) { return el('option', { value: c[0], text: c[1] + ' (' + c[2] + ')', selected: (m && m.campo ? m.campo : 'peso') === c[0] }); }));
+    var alvoMedida = el('input', { type: 'text', inputMode: 'decimal', value: m && m.alvoMedida ? String(m.alvoMedida).replace('.', ',') : '', placeholder: 'Ex.: 70' });
+    var sentido = m && m.sentido ? m.sentido : 'subir', sentidoEscolhido = !!(m && m.sentido);
+    var botoesSentido = [['subir', 'Chegar ou passar (≥)'], ['descer', 'Chegar ou baixar (≤)']].map(function (o) {
+      return el('button', { type: 'button', text: o[1], onclick: function () { sentido = o[0]; sentidoEscolhido = true; atualizar(); } });
+    });
+    var rotuloAlvoMedida = el('span', { class: 'campo-rotulo' });
+    var infoMedida = el('span', { class: 'campo-ajuda' });
+    var blocoMedida = el('div', { class: 'bloco-pr' }, [
+      el('div', { class: 'campos-linha' }, [UI.campo('Medida', selCampo), el('label', { class: 'campo' }, [rotuloAlvoMedida, alvoMedida])]),
+      el('div', { class: 'campo' }, [el('span', { class: 'campo-rotulo', text: 'Bate quando o registro' }), el('div', { class: 'segmentado' }, botoesSentido), infoMedida])
+    ]);
+    function textoValor(v, c) { return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' ' + c[2]; }
+    function tituloMedida() {
+      var c = Dados.campoMedida(selCampo.value), v = UI.lerValor(alvoMedida.value);
+      return v > 0 ? c[1] + ': ' + (sentido === 'descer' ? 'baixar para ' : 'chegar a ') + textoValor(v, c) : '';
+    }
+    [selCampo, alvoMedida].forEach(function (c) { c.addEventListener('input', atualizar); c.addEventListener('change', atualizar); });
+
     function atualizar() {
-      var pr = tipo === 'pr';
+      var pr = tipo === 'pr', med = tipo === 'medida';
       blocoPR.hidden = !pr;
-      campoArea.hidden = pr;
+      blocoMedida.hidden = !med;
+      campoArea.hidden = pr || med;
+      // Meta de medida: sentido deduzido do valor atual (alvo acima = ganhar; abaixo = perder), até você escolher.
+      var c = Dados.campoMedida(selCampo.value), u = Dados.ultimaMedida(c[0]), v = UI.lerValor(alvoMedida.value);
+      if (!sentidoEscolhido && u && v > 0) sentido = v < u.valor ? 'descer' : 'subir';
+      botoesSentido.forEach(function (b, i) { b.classList.toggle('ativo', (i === 0 ? 'subir' : 'descer') === sentido); });
+      rotuloAlvoMedida.textContent = 'Alvo (' + c[2] + ')';
+      infoMedida.textContent = (u ? 'Último registro: ' + textoValor(u.valor, c) + ' em ' + UI.fmtData(u.data) + '. ' : 'Ainda sem registro dessa medida. ')
+        + 'Vale o registro semanal a partir de hoje' + (v > 0 ? ': ' + (sentido === 'descer' ? textoValor(v, c) + ' ou menos' : textoValor(v, c) + ' ou mais') : '') + '.';
+      if (med) titulo.placeholder = (tituloMedida() || 'Ex.: Peso: chegar a 70 kg') + (tituloMedida() ? ' (ou escreva o seu)' : '');
+      if (med) return;
       var b = Dados.base(selEx.value), corpo = b && b.equipamento === 'corpo';
       campoCarga.hidden = corpo;
       rotuloReps.textContent = corpo ? 'Repetições' : 'Repetições (mínimo)';
@@ -57,7 +87,7 @@ var Metas = (function () {
       titulo.placeholder = pr ? (b ? tituloPR(b, UI.lerValor(alvoCarga.value) || 0, Number(alvoReps.value) || (corpo ? 12 : 1)) + ' (ou escreva o seu)' : 'Ex.: Supino com 50 kg') : 'Ex.: Correr 10 km';
     }
     [selEx, alvoCarga, alvoReps].forEach(function (c) { c.addEventListener('input', atualizar); c.addEventListener('change', atualizar); });
-    var segTipo = el('div', { class: 'segmentado' }, [['livre', 'Livre'], ['pr', 'Recorde (PR)']].map(function (o, i, arr) {
+    var segTipo = el('div', { class: 'segmentado' }, [['livre', 'Livre'], ['pr', 'Recorde (PR)'], ['medida', 'Medida corporal']].map(function (o, i, arr) {
       return el('button', { type: 'button', class: tipo === o[0] ? 'ativo' : '', text: o[1], onclick: function (ev) {
         tipo = o[0];
         Array.prototype.forEach.call(ev.currentTarget.parentNode.children, function (b, j) { b.classList.toggle('ativo', arr[j][0] === tipo); });
@@ -75,10 +105,16 @@ var Metas = (function () {
         if (!(n > 0)) { UI.aviso('Informe as repetições.'); alvoReps.focus(); return false; }
         campos.exercicioId = b.id; campos.alvoCarga = c; campos.alvoReps = n;
         campos.titulo = titulo.value.trim() || tituloPR(b, c, n);
+      } else if (tipo === 'medida') {
+        var v = UI.lerValor(alvoMedida.value);
+        if (!(v > 0)) { UI.aviso('Informe o alvo.'); alvoMedida.focus(); return false; }
+        campos.campo = selCampo.value; campos.alvoMedida = v; campos.sentido = sentido;
+        campos.titulo = titulo.value.trim() || tituloMedida();
       } else if (!titulo.value.trim()) { titulo.focus(); return false; }
       var antes = m ? m.concluida : false;
       var salva = Dados.salvarMeta(campos, id);
       if (salva.tipo === 'pr' && salva.concluida && !antes) UI.aviso('Seu PR já bate essa meta · +' + UI.fmtNum(Dados.xpDaMeta(salva)) + ' XP');
+      if (salva.tipo === 'medida' && salva.concluida && !antes) UI.aviso('O registro de hoje já bate essa meta · +' + UI.fmtNum(Dados.xpDaMeta(salva)) + ' XP');
       App.atualizar();
     } }];
     if (m) botoes.unshift({ texto: 'Excluir', classe: 'btn-perigo btn-esquerda', acao: function () {
@@ -87,6 +123,7 @@ var Metas = (function () {
     UI.modal(m ? 'Editar meta' : 'Nova meta', [
       el('div', { class: 'campo' }, [el('span', { class: 'campo-rotulo', text: 'Tipo' }), segTipo]),
       blocoPR,
+      blocoMedida,
       UI.campo('Meta', titulo),
       el('div', { class: 'campos-linha' }, [campoArea, UI.campo('Dificuldade', selDif, 'Quanto mais difícil, mais XP ao concluir.')]),
       UI.campo('Prazo (opcional)', prazo),
@@ -106,17 +143,19 @@ var Metas = (function () {
   }
 
   function cartao(m) {
-    var d = dificuldade(m.dificuldade), hoje = UI.hoje(), ehPR = m.tipo === 'pr';
+    var d = dificuldade(m.dificuldade), hoje = UI.hoje(), ehPR = m.tipo === 'pr', ehMedida = m.tipo === 'medida';
+    var pm = ehMedida ? Dados.progressoMetaMedida(m) : null;
+    function val(v) { return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' ' + pm.campo[2]; }
     var atrasada = !m.concluida && m.prazo && m.prazo < hoje;
     var prazo = m.concluida ? (ehPR ? 'Batida em ' : 'Concluída em ') + UI.fmtData(m.dataConclusao)
       : m.prazo ? (atrasada ? 'Prazo vencido em ' : 'Até ') + UI.fmtData(m.prazo) : 'Sem prazo';
     var p = ehPR ? Dados.progressoMetaPR(m) : null;
-    var marca = ehPR
-      ? el('span', { class: 'btn-check auto' + (m.concluida ? ' marcado' : ''), title: m.concluida ? 'Batida' : 'Batida sozinha ao registrar o treino' }, UI.icone('check'))
+    var marca = ehPR || ehMedida
+      ? el('span', { class: 'btn-check auto' + (m.concluida ? ' marcado' : ''), title: m.concluida ? 'Batida' : ehPR ? 'Batida sozinha ao registrar o treino' : 'Batida sozinha no registro semanal' }, UI.icone('check'))
       : el('button', { type: 'button', class: 'btn-check' + (m.concluida ? ' marcado' : ''), title: m.concluida ? 'Reabrir' : 'Concluir meta', onclick: function () { alternar(m); } }, UI.icone('check'));
     return el('div', { class: 'meta dif-' + m.dificuldade + (m.concluida ? ' concluida' : '') }, [
       marca,
-      UI.simboloMeta(ehPR ? 'pr' : m.area),
+      UI.simboloMeta(ehPR ? 'pr' : ehMedida ? 'medida' : m.area),
       el('button', { type: 'button', class: 'meta-corpo', title: 'Editar', onclick: function () { editar(m.id); } }, [
         el('span', { class: 'meta-titulo', text: m.titulo }),
         m.descricao ? el('span', { class: 'meta-descricao', text: m.descricao }) : null,
@@ -124,9 +163,13 @@ var Metas = (function () {
           el('span', { text: (p.base ? p.base.nome + ' · ' : '') + 'PR atual: ' + Configuracoes.textoPR(p.pr) + ' · alvo: ' + (p.corpo ? m.alvoReps + ' reps' : kg(m.alvoCarga) + (m.alvoReps > 1 ? ' × ' + m.alvoReps : '')) }),
           UI.barra(p.pct)
         ]) : null,
+        pm ? el('span', { class: 'meta-pr' }, [
+          el('span', { text: pm.campo[1] + ' · ' + (pm.inicial != null ? 'início: ' + val(pm.inicial) + ' · ' : '') + 'atual: ' + (pm.atual ? val(pm.atual.valor) : '—') + ' · alvo: ' + val(m.alvoMedida) + (m.sentido === 'descer' ? ' ou menos' : ' ou mais') }),
+          UI.barra(pm.pct)
+        ]) : null,
         el('span', { class: 'meta-rodape' }, [
-          UI.selo(ehPR ? 'Recorde' : nomeArea(m.area), 'info'),
-          ehPR ? UI.selo('automática', 'neutro') : null,
+          UI.selo(ehPR ? 'Recorde' : ehMedida ? 'Medida' : nomeArea(m.area), 'info'),
+          ehPR || ehMedida ? UI.selo('automática', 'neutro') : null,
           UI.selo(d[1], 'neutro'),
           el('span', { class: 'meta-prazo' + (atrasada ? ' negativo' : ''), text: prazo })
         ])

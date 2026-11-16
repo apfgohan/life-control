@@ -576,10 +576,11 @@ var Dados = (function () {
     ['peso', 'braco', 'coxa', 'panturrilha'].forEach(function (k) { var v = numero(campos[k], 0, 500, NaN); m[k] = isFinite(v) && v > 0 ? v : null; });
     m.obs = texto(campos.obs);
     if (campos.fotos) Object.keys(campos.fotos).forEach(function (k) { if (campos.fotos[k] !== undefined) m.fotos[k] = campos.fotos[k] || null; });
+    sincronizarMetasPR(); // metas de medida (ex.: chegar a 70 kg); as batidas agora ficam em metasRecemBatidas()
     salvar();
     return m;
   }
-  function excluirMedida(id) { db.medidas = db.medidas.filter(function (m) { return m.id !== id; }); salvar(); }
+  function excluirMedida(id) { db.medidas = db.medidas.filter(function (m) { return m.id !== id; }); sincronizarMetasPR(); salvar(); }
   // Domingo do registro semanal: hoje, se for domingo; senão, o último domingo.
   function domingoDaSemana(iso) { var d = diaDaSemana(iso); return d === 6 ? iso : UI.somarDias(iso, -(d + 1)); }
   // O registro do domingo mais recente está pendente? (Só depois que há plano alimentar ou algum registro.)
@@ -665,11 +666,23 @@ var Dados = (function () {
       m.exercicioId = b.id;
       m.alvoCarga = b.equipamento === 'corpo' ? 0 : numero(campos.alvoCarga, 0, 1000, 0);
       m.alvoReps = Math.max(1, Math.round(numero(campos.alvoReps, 1, 999, 1)));
+    } else if (campos.tipo === 'medida' && CAMPOS_MEDIDA.some(function (c) { return c[0] === campos.campo; })) {
+      // Meta de medida (peso, braço, coxa, panturrilha): batida sozinha no registro semanal que chegar ao alvo.
+      var mudouCampo = m.tipo !== 'medida' || m.campo !== campos.campo;
+      m.tipo = 'medida';
+      m.area = 'dieta';
+      m.campo = campos.campo;
+      m.alvoMedida = numero(campos.alvoMedida, 0, 500, 0);
+      if (mudouCampo || !m.desde) { m.desde = UI.hoje(); m.inicial = valorAtual(m.campo); }
+      m.sentido = campos.sentido === 'descer' ? 'descer' : 'subir';
+      delete m.exercicioId; delete m.alvoCarga; delete m.alvoReps;
     } else {
+      if (eraPR || m.tipo === 'medida') { m.concluida = false; m.dataConclusao = null; }
       m.tipo = 'livre';
       delete m.exercicioId; delete m.alvoCarga; delete m.alvoReps;
-      if (eraPR) { m.concluida = false; m.dataConclusao = null; }
+      delete m.campo; delete m.alvoMedida; delete m.sentido; delete m.desde; delete m.inicial;
     }
+    if (m.tipo === 'pr') { delete m.campo; delete m.alvoMedida; delete m.sentido; delete m.desde; delete m.inicial; }
     sincronizarMetasPR();
     salvar();
     return m;
@@ -680,18 +693,45 @@ var Dados = (function () {
     return x.reps >= (m.alvoReps || 1) && (corpo || x.carga >= (m.alvoCarga || 0) - 1e-9);
   }
   function resultadoQueBateu(m) { return resultadosDaBase(m.exercicioId).filter(function (x) { return bateAlvo(m, x); })[0] || null; }
-  // Atualiza as metas de recorde a partir dos treinos. Devolve as que acabaram de ser batidas.
+  // ---------- Metas de medida ----------
+  var CAMPOS_MEDIDA = [['peso', 'Peso', 'kg'], ['braco', 'Braço', 'cm'], ['coxa', 'Coxa', 'cm'], ['panturrilha', 'Panturrilha', 'cm']];
+  function campoMedida(id) { return CAMPOS_MEDIDA.filter(function (c) { return c[0] === id; })[0] || CAMPOS_MEDIDA[0]; }
+  // Último valor registrado de uma medida (ou null) e a data.
+  function ultimaMedida(campo) {
+    var l = medidas().filter(function (x) { return x[campo] != null; });
+    return l.length ? { valor: l[0][campo], data: l[0].data } : null;
+  }
+  function valorAtual(campo) { var u = ultimaMedida(campo); return u ? u.valor : null; }
+  function bateMedida(m, v) { return v != null && (m.sentido === 'descer' ? v <= m.alvoMedida + 1e-9 : v >= m.alvoMedida - 1e-9); }
+  // Primeiro registro (a partir da criação da meta) que chega ao alvo.
+  function medidaQueBateu(m) {
+    return medidas().slice().reverse().filter(function (x) { return x.data >= (m.desde || '') && bateMedida(m, x[m.campo]); })[0] || null;
+  }
+  function progressoMetaMedida(m) {
+    var c = campoMedida(m.campo), u = ultimaMedida(m.campo), ini = m.inicial;
+    var pct = 0;
+    if (m.concluida) pct = 100;
+    else if (u && ini != null && Math.abs(m.alvoMedida - ini) > 1e-9) pct = Math.max(0, Math.min(99, (u.valor - ini) / (m.alvoMedida - ini) * 100));
+    return { campo: c, atual: u, inicial: ini, pct: pct };
+  }
+
+  // Atualiza as metas automáticas (recorde e medida) a partir dos registros. Devolve as que acabaram de ser batidas.
+  var recemBatidas = [];
   function sincronizarMetasPR() {
     var novas = [];
     db.metas.forEach(function (m) {
-      if (m.tipo !== 'pr') return;
-      var x = resultadoQueBateu(m), antes = !!m.concluida;
-      m.concluida = !!x;
-      m.dataConclusao = x ? x.data : null;
+      if (m.tipo !== 'pr' && m.tipo !== 'medida') return;
+      var antes = !!m.concluida, data = null;
+      if (m.tipo === 'pr') { var x = resultadoQueBateu(m); data = x ? x.data : null; }
+      else { var r = medidaQueBateu(m); data = r ? r.data : null; }
+      m.concluida = !!data;
+      m.dataConclusao = data;
       if (m.concluida && !antes) novas.push(m);
     });
+    recemBatidas = novas;
     return novas;
   }
+  function metasRecemBatidas() { return recemBatidas.slice(); }
   // Progresso da meta de recorde: o PR atual comparado ao alvo.
   function progressoMetaPR(m) {
     var b = base(m.exercicioId), pr = b ? prDaBase(b.id) : null, corpo = b && b.equipamento === 'corpo';
@@ -701,7 +741,7 @@ var Dados = (function () {
   }
   function concluirMeta(id, feita) {
     var m = meta(id);
-    if (!m || m.tipo === 'pr') return;
+    if (!m || m.tipo === 'pr' || m.tipo === 'medida') return; // essas se marcam sozinhas
     m.concluida = feita !== false;
     m.dataConclusao = m.concluida ? UI.hoje() : null;
     salvar();
@@ -909,7 +949,7 @@ var Dados = (function () {
     db.metas.forEach(function (m) {
       var data = m.concluida ? m.dataConclusao : m.prazo;
       if (!data || data.slice(0, 7) !== mes) return;
-      var area = m.tipo === 'pr' ? 'pr' : m.area === 'estudos' ? 'estudo' : m.area === 'habitos' ? 'habito' : m.area;
+      var area = m.tipo === 'pr' ? 'pr' : m.tipo === 'medida' ? 'medida' : m.area === 'estudos' ? 'estudo' : m.area === 'habitos' ? 'habito' : m.area;
       contar(area, m.concluida ? 'batida' : m.prazo < hoje ? 'falhou' : 'falta');
     });
     var decididas = r.batidas + r.falharam;
@@ -971,6 +1011,7 @@ var Dados = (function () {
     xpDosHabitos: xpDosHabitos, diaDaSemana: diaDaSemana,
     GRUPOS: GRUPOS, base: base, biblioteca: biblioteca, salvarBase: salvarBase, excluirBase: excluirBase, treinosComBase: treinosComBase,
     baseDoExercicio: baseDoExercicio, resultadosDaBase: resultadosDaBase, prDaBase: prDaBase, progressoMetaPR: progressoMetaPR,
+    CAMPOS_MEDIDA: CAMPOS_MEDIDA, campoMedida: campoMedida, ultimaMedida: ultimaMedida, progressoMetaMedida: progressoMetaMedida, metasRecemBatidas: metasRecemBatidas,
     FAIXAS_MES: FAIXAS_MES, faixaDoPct: faixaDoPct, resumoDoMes: resumoDoMes
   };
 })();

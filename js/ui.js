@@ -89,7 +89,7 @@ var UI = (function () {
 
   // Símbolo do tipo de meta: ícone num círculo com a cor da área (estudo, treino, dieta, hábito ou recorde).
   var SIMBOLOS = { estudo: ['livro', 'Estudo'], estudos: ['livro', 'Estudo'], treino: ['halter', 'Treino'], dieta: ['prato', 'Dieta'],
-    habito: ['brilho', 'Hábito'], habitos: ['brilho', 'Hábito'], pr: ['trofeu', 'Recorde (PR)'] };
+    habito: ['brilho', 'Hábito'], habitos: ['brilho', 'Hábito'], pr: ['trofeu', 'Recorde (PR)'], medida: ['balanca', 'Medida corporal'] };
   function simboloMeta(area) {
     var s = SIMBOLOS[area] || SIMBOLOS.habito, chave = area === 'estudos' ? 'estudo' : area === 'habitos' ? 'habito' : SIMBOLOS[area] ? area : 'habito';
     return el('span', { class: 'simbolo-meta simbolo-' + chave, title: s[1] }, icone(s[0]));
