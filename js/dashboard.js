@@ -183,7 +183,7 @@ var Dashboard = (function () {
     var detalheDieta = dAtual.total ? dAtual.dieta + ' de ' + dAtual.total + ' refeições' + (dAtual.faltam ? ' · ' + dAtual.faltam + ' sem registro' : '') + (vD.texto ? ' · ' + vD.texto : '') : 'sem plano';
     raiz.appendChild(el('div', { class: 'grade-kpi' }, [
       kpi('Patente', p.patente.nome, UI.fmtNum(p.xp) + ' XP' + (p.proxima ? ' · faltam ' + UI.fmtNum(p.falta) : '')),
-      kpi('Índice do mês', p.mesAtual.faixa ? p.mesAtual.faixa.nome : '—', p.mesAtual.faixa ? Math.floor(p.mesAtual.pct) + '% · ' + p.mesAtual.batidas + ' batidas, ' + p.mesAtual.falharam + ' falharam · XP ×' + String(p.mesAtual.multiplicador).replace('.', ',') : 'sem metas decididas'),
+      kpi('Índice do mês', p.mesAtual.faixa ? p.mesAtual.faixa.nome : '—', p.mesAtual.faixa ? Math.floor(p.mesAtual.pct) + '% · ' + p.mesAtual.batidas + ' batidas, ' + p.mesAtual.falharam + ' falharam · no fim do mês ×' + String(p.mesAtual.multiplicador).replace('.', ',') : 'sem metas decididas'),
       kpi('Treinos na semana', String(tAtual), vT.texto, vT.classe),
       kpi('Dieta na semana', dAtual.pct == null ? '—' : dAtual.pct + '%', detalheDieta, vD.classe),
       kpi('Metas recorrentes', mAtual.pct == null ? '—' : mAtual.pct + '%', mAtual.possiveis ? mAtual.feitas + ' de ' + mAtual.possiveis + (vM.texto ? ' · ' + vM.texto : '') : 'nenhuma meta', vM.classe),

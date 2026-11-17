@@ -50,16 +50,15 @@ var Patentes = (function () {
     r.fontes.treinos = t.xp; r.qtd.treinos = t.feitos; r.xpHoje += t.hoje; somar(t.porMes);
     var di = Dados.xpDaDieta(hoje);
     r.fontes.dieta = di.xp; r.qtd.dieta = di.seguidas; r.qtd.perdidas = di.perdidas; r.xpHoje += di.hoje; somar(di.porMes);
-    // Multiplicador do mês só sobre saldo positivo (um mês negativo pela dieta não fica ainda pior com o bônus).
-    var base = 0, total = 0;
+    // O multiplicador só vale quando o mês termina (o mês corrente fica ×1 até lá), e só sobre saldo positivo
+    // (um mês negativo pela dieta não fica ainda pior com o bônus).
+    var base = 0, total = 0, mesAtual = hoje.slice(0, 7);
     Object.keys(porMes).sort().forEach(function (k) {
-      var v = porMes[k], s = Dados.resumoDoMes(k, hoje), mult = v > 0 ? s.multiplicador : 1;
+      var v = porMes[k], s = Dados.resumoDoMes(k, hoje), fechado = k < mesAtual, mult = fechado && v > 0 ? s.multiplicador : 1;
       base += v; total += v * mult;
-      r.meses.push({ mes: k, xp: v, multiplicador: mult, faixa: s.faixa, final: Math.round(v * mult) });
+      r.meses.push({ mes: k, xp: v, multiplicador: mult, faixa: s.faixa, resumo: s, fechado: fechado, final: Math.round(v * mult) });
     });
-    var atual = Dados.resumoDoMes(hoje.slice(0, 7), hoje);
-    r.mesAtual = atual;
-    if (r.xpHoje > 0) r.xpHoje = Math.round(r.xpHoje * atual.multiplicador);
+    r.mesAtual = Dados.resumoDoMes(mesAtual, hoje);
     r.fontes.bonus = Math.round(total - base);
     // Os pontos perdidos na dieta podem levar o total abaixo de zero; a patente mínima continua sendo a primeira.
     r.xp = Math.max(0, Math.round(total));
@@ -101,7 +100,7 @@ var Patentes = (function () {
         UI.metrica('Índice dos meses', (r.fontes.bonus >= 0 ? '+' : '−') + UI.fmtNum(Math.abs(r.fontes.bonus)) + ' XP', r.fontes.bonus < 0 ? 'alerta' : r.fontes.bonus > 0 ? 'completo' : ''),
         UI.metrica('Hoje', '+' + UI.fmtNum(r.xpHoje) + ' XP', r.xpHoje ? 'completo' : '')
       ]),
-      el('div', { class: 'campo-ajuda', text: 'Metas rendem ' + Dados.DIFICULDADES.map(function (d) { return d[2] + ' (' + d[1].toLowerCase() + ')'; }).join(', ') + ' XP. Cada treino finalizado rende ' + Dados.XP_TREINO.base + ' XP + ' + Dados.XP_TREINO.exercicio + ' por exercício feito. Na dieta, cada refeição seguida rende ' + Dados.XP_DIETA.refeicao + ' XP, cada refeição não registrada tira ' + (-Dados.XP_DIETA.perdida) + ' e o registro de domingo rende ' + Dados.XP_DIETA.medidas + '. Metas recorrentes cumpridas: ' + Dados.XP_PERIODO.dia + ' XP por dia, ' + Dados.XP_PERIODO.semana + ' por semana e ' + Dados.XP_PERIODO.mes + ' por mês, vezes 1, 1,5 ou 2 conforme a dificuldade. Lembretes concluídos rendem 5, 10 ou 20 XP conforme a relevância. No fim, o XP de cada mês é multiplicado pelo índice do mês (% das metas batidas): ' + Dados.FAIXAS_MES.map(function (f) { return f.nome + (f.min ? ' (' + f.min + '%)' : ' (abaixo disso)') + ' ×' + String(f.mult).replace('.', ','); }).join(', ') + '.' }),
+      el('div', { class: 'campo-ajuda', text: 'Metas rendem ' + Dados.DIFICULDADES.map(function (d) { return d[2] + ' (' + d[1].toLowerCase() + ')'; }).join(', ') + ' XP. Cada treino finalizado rende ' + Dados.XP_TREINO.base + ' XP + ' + Dados.XP_TREINO.exercicio + ' por exercício feito. Na dieta, cada refeição seguida rende ' + Dados.XP_DIETA.refeicao + ' XP, cada refeição não registrada tira ' + (-Dados.XP_DIETA.perdida) + ' e o registro de domingo rende ' + Dados.XP_DIETA.medidas + '. Metas recorrentes cumpridas: ' + Dados.XP_PERIODO.dia + ' XP por dia, ' + Dados.XP_PERIODO.semana + ' por semana e ' + Dados.XP_PERIODO.mes + ' por mês, vezes 1, 1,5 ou 2 conforme a dificuldade. Lembretes concluídos rendem 5, 10 ou 20 XP conforme a relevância. Quando o mês termina, o XP dele é multiplicado pelo índice do mês (% das metas batidas): ' + Dados.FAIXAS_MES.map(function (f) { return f.nome + (f.min ? ' (' + f.min + '%)' : ' (abaixo disso)') + ' ×' + String(f.mult).replace('.', ','); }).join(', ') + '.' }),
       el('div', { class: 'escada' }, LISTA.map(function (p) {
         return el('div', { class: 'degrau' + (p.indice === r.indice ? ' atual' : p.indice < r.indice ? ' passado' : '') }, [
           insignia(p.indice, 'media'),
@@ -130,5 +129,44 @@ var Patentes = (function () {
     ]), [{ texto: 'Continuar', classe: 'btn-primario' }]);
   }
 
-  return { LISTA: LISTA, calcular: calcular, insignia: insignia, abrir: abrir, conferirPromocao: conferirPromocao, xpDoLembrete: xpDoLembrete };
+  // ---------- Fechamento do mês ----------
+  // Na primeira abertura depois da virada do mês, mostra o índice do mês que terminou e o bônus (ou a perda) de XP.
+  var CHAVE_MES = 'life-control.mes-visto';
+  var MENSAGENS = {
+    lendario: ['Mês lendário!', 'Você bateu todas as metas do mês. Os bardos vão cantar sobre isso: seus pontos dobraram.'],
+    heroico: ['Mês heroico!', 'Quase tudo cumprido. Um feito digno de um herói: seus pontos cresceram 50%.'],
+    valoroso: ['Mês valoroso!', 'Mostrou valor em batalha. Seus pontos cresceram 25%.'],
+    bronze: ['Mês de bronze', 'Firme, mas sem bônus. Mais um pouco de disciplina e o próximo mês rende pontos extras.'],
+    ferro: ['Mês de ferro', 'Você segurou a linha, sem bônus e sem perdas. No próximo mês, mire no Valoroso.'],
+    derrotado: ['Derrota neste mês', 'As metas venceram desta vez e o mês custou 10% dos pontos. Levante o escudo: um novo mês começa hoje.']
+  };
+  function conferirFechamento() {
+    var hoje = UI.hoje(), mesAtual = hoje.slice(0, 7), visto = null;
+    try { visto = localStorage.getItem(CHAVE_MES); } catch (e) { return false; }
+    function guardar() { try { localStorage.setItem(CHAVE_MES, mesAtual); } catch (e) { /* preferência */ } }
+    if (!visto) { guardar(); return false; }
+    if (visto >= mesAtual) return false;
+    if (document.querySelector('.modal-fundo')) return false; // tenta de novo na próxima tela
+    guardar();
+    // O mês que acabou de fechar (o anterior ao atual).
+    var anterior = UI.somarMeses(mesAtual, -1), r = calcular();
+    var m = r.meses.filter(function (x) { return x.mes === anterior; })[0], s = m ? m.resumo : Dados.resumoDoMes(anterior, hoje);
+    if (!s.faixa) return false; // mês sem metas decididas: nada para mostrar
+    var bonus = m ? m.final - m.xp : 0, msg = MENSAGENS[s.faixa.id] || ['Fim do mês', ''];
+    var nome = UI.nomeMes(anterior).split(' ')[0];
+    UI.modal('Fechamento de ' + nome.toLowerCase(), el('div', { class: 'promocao fechamento faixa-' + s.faixa.id }, [
+      el('span', { class: 'mes-escudo grande' }, UI.icone('escudo')),
+      el('div', { class: 'patente-nome', text: s.faixa.nome + ' · ×' + String(s.faixa.mult).replace('.', ',') }),
+      el('div', { class: 'promocao-texto', text: msg[0] }),
+      el('p', { class: 'modal-desc', text: msg[1] }),
+      el('div', { class: 'registro-resumo' }, [
+        UI.metrica('Metas batidas', s.batidas + ' de ' + (s.batidas + s.falharam) + ' (' + Math.floor(s.pct) + '%)'),
+        UI.metrica('XP do mês', UI.fmtNum(m ? m.xp : 0)),
+        UI.metrica(bonus >= 0 ? 'Bônus' : 'Perda', (bonus > 0 ? '+' : bonus < 0 ? '−' : '') + UI.fmtNum(Math.abs(bonus)) + ' XP', bonus > 0 ? 'completo' : bonus < 0 ? 'alerta' : '')
+      ])
+    ]), [{ texto: 'Começar ' + UI.nomeMes(mesAtual).split(' ')[0].toLowerCase(), classe: 'btn-primario' }]);
+    return true;
+  }
+
+  return { LISTA: LISTA, calcular: calcular, insignia: insignia, abrir: abrir, conferirPromocao: conferirPromocao, conferirFechamento: conferirFechamento, xpDoLembrete: xpDoLembrete };
 })();

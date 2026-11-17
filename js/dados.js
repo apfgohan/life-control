@@ -957,8 +957,10 @@ var Dados = (function () {
     var chave = mes + '|' + hoje + '|' + (window.Estudos ? Estudos.info().lidoEm || 0 : 0);
     if (cacheMes[mes] && cacheMes[mes].chave === chave) return cacheMes[mes].r;
     var ini = mes + '-01', fim = mes + '-' + UI.pad(diasNoMes(mes));
-    var r = { mes: mes, total: 0, batidas: 0, falharam: 0, faltam: 0, porArea: {} };
-    function contar(area, estado) {
+    var r = { mes: mes, total: 0, batidas: 0, falharam: 0, faltam: 0, porArea: {}, linhas: [] };
+    // linhas: uma por meta, com uma caixinha por ocorrência ({ estado, rotulo, data, hoje }).
+    function contar(area, estado, linha, rotulo, data, pFim) {
+      if (linha) linha.caixas.push({ estado: estado, rotulo: rotulo, data: data, atual: data <= hoje && (pFim || data) >= hoje });
       r.total++;
       r[estado === 'batida' ? 'batidas' : estado === 'falhou' ? 'falharam' : 'faltam']++;
       var a = r.porArea[area] || (r.porArea[area] = { total: 0, batidas: 0, falharam: 0, faltam: 0 });
@@ -969,12 +971,13 @@ var Dados = (function () {
       var ok = progressoHabito(h, pIni).completo;
       return ok ? 'batida' : pFim < hoje ? 'falhou' : 'falta';
     }
-    db.habitos.forEach(function (h) {
+    habitos().forEach(function (h) {
       var desde = maior(h.desde || ini, inicioProjeto());
+      var linha = { titulo: h.titulo, area: h.area, periodo: h.periodo, caixas: [] };
       if (h.periodo === 'dia') {
         for (var d = ini; d <= fim; d = UI.somarDias(d, 1)) {
           if (d < desde || !habitoValeNoDia(h, d)) continue;
-          contar(h.area, estado(h, d, d));
+          contar(h.area, estado(h, d, d), linha, UI.fmtDiaMes(d), d);
         }
       } else if (h.periodo === 'semana') {
         var seg = UI.somarDias(ini, -diaDaSemana(ini));
@@ -983,19 +986,22 @@ var Dados = (function () {
           var dom = UI.somarDias(seg, 6), est = estado(h, seg, dom);
           // Semana pela metade (a meta foi criada no meio dela) não conta como falha.
           if (dom < desde || (seg < desde && est === 'falhou')) continue;
-          contar(h.area, est);
+          contar(h.area, est, linha, 'Semana de ' + UI.fmtDiaMes(seg) + ' a ' + UI.fmtDiaMes(dom), seg, dom);
         }
       } else if (fim >= desde) {
         var estMes = estado(h, ini, fim);
-        if (ini >= desde || estMes !== 'falhou') contar(h.area, estMes); // mês pela metade não conta como falha
+        if (ini >= desde || estMes !== 'falhou') contar(h.area, estMes, linha, UI.nomeMes(mes), ini, fim); // mês pela metade não conta como falha
       }
+      if (linha.caixas.length) r.linhas.push(linha);
     });
+    var longo = { titulo: 'Metas de longo prazo', area: 'longo', periodo: 'longo', caixas: [] };
     db.metas.forEach(function (m) {
       var data = m.concluida ? m.dataConclusao : m.prazo;
       if (!data || data.slice(0, 7) !== mes || antesDoInicio(data)) return;
       var area = m.tipo === 'pr' ? 'pr' : m.tipo === 'medida' ? 'medida' : m.area === 'estudos' ? 'estudo' : m.area === 'habitos' ? 'habito' : m.area;
-      contar(area, m.concluida ? 'batida' : m.prazo < hoje ? 'falhou' : 'falta');
+      contar(area, m.concluida ? 'batida' : m.prazo < hoje ? 'falhou' : 'falta', longo, m.titulo + ' · ' + UI.fmtDiaMes(data), data);
     });
+    if (longo.caixas.length) r.linhas.push(longo);
     var decididas = r.batidas + r.falharam;
     r.pct = decididas ? r.batidas / decididas * 100 : null;
     r.faixa = faixaDoPct(r.pct);

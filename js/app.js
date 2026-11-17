@@ -30,7 +30,8 @@ var App = (function () {
     raiz.innerHTML = '';
     rotas[nome](raiz, partes.slice(1));
     window.scrollTo(0, rolagem);
-    Patentes.conferirPromocao();
+    // Primeiro o fechamento do mês (na virada); a promoção, se houver, aparece na próxima tela.
+    if (!Patentes.conferirFechamento()) Patentes.conferirPromocao();
   }
 
   // ---------- Menu lateral ----------

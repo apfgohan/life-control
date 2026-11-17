@@ -70,7 +70,7 @@ var Inicio = (function () {
           el('span', { class: 'mes-escudo' }, UI.icone('escudo')),
           el('div', { class: 'mes-indice-texto' }, [
             el('strong', { class: 'mes-faixa', text: f ? f.nome : 'Sem índice ainda' }),
-            el('span', { text: f ? 'Parcial: ' + Math.floor(s.pct) + '% das metas já decididas · XP do mês ' + mult(f.mult) + (s.faltam ? ' · ainda ' + s.faltam + ' em jogo' : '') : 'Aparece quando a primeira meta do mês for decidida.' })
+            el('span', { text: f ? 'Até agora: ' + Math.floor(s.pct) + '% batidas · no fim do mês o XP dele vale ' + mult(f.mult) : 'Aparece quando a primeira meta do mês for decidida.' })
           ])
         ]),
         el('div', { class: 'mes-numeros' }, [
@@ -79,8 +79,17 @@ var Inicio = (function () {
           bloco('falharam', s.falharam, s.falharam ? 'negativo' : ''),
           bloco('faltam', s.faltam)
         ]),
-        el('div', { class: 'mes-barra', role: 'img', 'aria-label': s.batidas + ' batidas, ' + s.falharam + ' falharam, ' + s.faltam + ' faltam' }, partes.map(function (x) {
-          return el('span', { class: 'mes-seg seg-' + x[0], style: { flexGrow: String(x[1]) }, title: x[1] + ' ' + x[0] });
+        // Uma linha por meta, com uma caixinha por ocorrência: ✓ batida, ✕ falhou, vazia = ainda em jogo.
+        el('div', { class: 'mes-linhas' }, s.linhas.map(function (l) {
+          var b = l.caixas.filter(function (c) { return c.estado === 'batida'; }).length;
+          return el('div', { class: 'mes-linha' }, [
+            l.area === 'longo' ? UI.simboloMeta('pr') : UI.simboloMeta(l.area),
+            el('span', { class: 'mes-linha-nome', title: l.titulo, text: l.titulo }),
+            el('span', { class: 'mes-caixas', role: 'img', 'aria-label': l.titulo + ': ' + b + ' de ' + l.caixas.length + ' batidas' }, l.caixas.map(function (c) {
+              return el('span', { class: 'caixa ' + c.estado + (c.atual ? ' atual' : ''), title: c.rotulo + ' · ' + (c.estado === 'batida' ? 'batida' : c.estado === 'falhou' ? 'falhou' : c.atual ? 'em curso' : 'ainda vai acontecer'), text: c.estado === 'batida' ? '✓' : c.estado === 'falhou' ? '✕' : '' });
+            })),
+            el('span', { class: 'mes-linha-conta', text: b + '/' + l.caixas.length })
+          ]);
         })),
         dica ? el('p', { class: 'mes-dica', text: dica }) : null
       ]) : el('p', { class: 'modal-desc', text: 'Crie metas recorrentes ou de longo prazo com prazo neste mês para acompanhar o índice.' })
@@ -91,7 +100,7 @@ var Inicio = (function () {
     var s = Dados.resumoDoMes(UI.hoje().slice(0, 7));
     UI.modal('Índice do mês', [
       el('p', { class: 'modal-desc', text: 'Cada ocorrência conta como uma meta: cada dia de uma meta diária, cada semana de uma semanal (a semana entra no mês do seu domingo), a meta mensal e as metas de longo prazo com prazo no mês. Falhou = o período acabou sem cumprir; falta = ainda vai acontecer ou está em curso.' }),
-      el('p', { class: 'modal-desc', text: 'O índice é a % das metas batidas entre as já decididas (batidas + falharam). Ele multiplica todo o XP ganho no mês: treinos, dieta, metas e lembretes.' }),
+      el('p', { class: 'modal-desc', text: 'O índice é a % das metas batidas entre as já decididas (batidas + falharam). Quando o mês termina, ele multiplica todo o XP ganho no mês: treinos, dieta, metas e lembretes. Na virada do mês aparece o fechamento com o bônus (ou a perda).' }),
       el('div', { class: 'faixas-mes' }, Dados.FAIXAS_MES.map(function (f, i) {
         var anterior = Dados.FAIXAS_MES[i - 1];
         return el('div', { class: 'faixa-linha faixa-' + f.id + (s.faixa === f ? ' atual' : '') }, [
