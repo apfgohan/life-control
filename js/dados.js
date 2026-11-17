@@ -984,13 +984,14 @@ var Dados = (function () {
         if (UI.somarDias(seg, 6) < ini) seg = UI.somarDias(seg, 7);
         for (; UI.somarDias(seg, 6) <= fim; seg = UI.somarDias(seg, 7)) {
           var dom = UI.somarDias(seg, 6), est = estado(h, seg, dom);
-          // Semana pela metade (a meta foi criada no meio dela) não conta como falha.
-          if (dom < desde || (seg < desde && est === 'falhou')) continue;
+          // Semana pela metade (começou antes do projeto ou da meta): só entra se for batida, nunca como falha ou pendente.
+          if (dom < desde || (seg < desde && est !== 'batida')) continue;
           contar(h.area, est, linha, 'Semana de ' + UI.fmtDiaMes(seg) + ' a ' + UI.fmtDiaMes(dom), seg, dom);
         }
       } else if (fim >= desde) {
         var estMes = estado(h, ini, fim);
-        if (ini >= desde || estMes !== 'falhou') contar(h.area, estMes, linha, UI.nomeMes(mes), ini, fim); // mês pela metade não conta como falha
+        // Mês pela metade (ex.: o projeto começou no dia 16): impossível de cumprir inteiro, só entra se for batido.
+        if (ini >= desde || estMes === 'batida') contar(h.area, estMes, linha, UI.nomeMes(mes), ini, fim);
       }
       if (linha.caixas.length) r.linhas.push(linha);
     });

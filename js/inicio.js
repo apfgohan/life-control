@@ -79,18 +79,16 @@ var Inicio = (function () {
           bloco('falharam', s.falharam, s.falharam ? 'negativo' : ''),
           bloco('faltam', s.faltam)
         ]),
-        // Uma linha por meta, com uma caixinha por ocorrência: ✓ batida, ✕ falhou, vazia = ainda em jogo.
-        el('div', { class: 'mes-linhas' }, s.linhas.map(function (l) {
-          var b = l.caixas.filter(function (c) { return c.estado === 'batida'; }).length;
-          return el('div', { class: 'mes-linha' }, [
-            l.area === 'longo' ? UI.simboloMeta('pr') : UI.simboloMeta(l.area),
-            el('span', { class: 'mes-linha-nome', title: l.titulo, text: l.titulo }),
-            el('span', { class: 'mes-caixas', role: 'img', 'aria-label': l.titulo + ': ' + b + ' de ' + l.caixas.length + ' batidas' }, l.caixas.map(function (c) {
-              return el('span', { class: 'caixa ' + c.estado + (c.atual ? ' atual' : ''), title: c.rotulo + ' · ' + (c.estado === 'batida' ? 'batida' : c.estado === 'falhou' ? 'falhou' : c.atual ? 'em curso' : 'ainda vai acontecer'), text: c.estado === 'batida' ? '✓' : c.estado === 'falhou' ? '✕' : '' });
-            })),
-            el('span', { class: 'mes-linha-conta', text: b + '/' + l.caixas.length })
-          ]);
-        })),
+        // Grade única: uma caixinha por meta do mês, em ordem de data. ✓ batida, ✕ falhou, vazia = ainda em jogo.
+        (function () {
+          var todas = [];
+          s.linhas.forEach(function (l, i) { l.caixas.forEach(function (c) { todas.push({ c: c, titulo: l.area === 'longo' ? '' : l.titulo, ordem: i }); }); });
+          todas.sort(function (a, b) { return a.c.data !== b.c.data ? (a.c.data < b.c.data ? -1 : 1) : a.ordem - b.ordem; });
+          return el('div', { class: 'mes-caixas mes-grade', role: 'img', 'aria-label': s.batidas + ' batidas, ' + s.falharam + ' falharam, ' + s.faltam + ' faltam' }, todas.map(function (x) {
+            var c = x.c;
+            return el('span', { class: 'caixa ' + c.estado + (c.atual ? ' atual' : ''), title: (x.titulo ? x.titulo + ' · ' : '') + c.rotulo + ' · ' + (c.estado === 'batida' ? 'batida' : c.estado === 'falhou' ? 'falhou' : c.atual ? 'em curso' : 'ainda vai acontecer'), text: c.estado === 'batida' ? '✓' : c.estado === 'falhou' ? '✕' : '' });
+          }));
+        })(),
         dica ? el('p', { class: 'mes-dica', text: dica }) : null
       ]) : el('p', { class: 'modal-desc', text: 'Crie metas recorrentes ou de longo prazo com prazo neste mês para acompanhar o índice.' })
     ]);

@@ -885,3 +885,6 @@ h1, h2, p { margin: 0; }
   .mes-linha-conta { grid-row: 1; grid-column: 3; }
   .caixa { width: 16px; height: 16px; font-size: 10px; }
 }
+.mes-grade { grid-column: 1 / -1; gap: 4px; }
+.mes-grade .caixa { width: 20px; height: 20px; }
+@media (max-width: 700px) { .mes-grade .caixa { width: 18px; height: 18px; } }
