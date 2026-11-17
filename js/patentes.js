@@ -33,13 +33,13 @@ var Patentes = (function () {
     function somar(mapa) { Object.keys(mapa).forEach(function (k) { porMes[k] = (porMes[k] || 0) + mapa[k]; }); }
     function noMes(iso, v) { if (iso) porMes[iso.slice(0, 7)] = (porMes[iso.slice(0, 7)] || 0) + v; }
     db.metas.forEach(function (m) {
-      if (!m.concluida) return;
+      if (!m.concluida || Dados.antesDoInicio(m.dataConclusao || hoje)) return;
       var x = Dados.xpDaMeta(m);
       r.fontes.metas += x; r.qtd.metas++; noMes(m.dataConclusao || hoje, x);
       if (m.dataConclusao === hoje) r.xpHoje += x;
     });
     db.lembretes.forEach(function (l) {
-      if (!l.concluido) return;
+      if (!l.concluido || Dados.antesDoInicio(l.dataConclusao || hoje)) return;
       var x = xpDoLembrete(l);
       r.fontes.lembretes += x; r.qtd.lembretes++; noMes(l.dataConclusao || hoje, x);
       if (l.dataConclusao === hoje) r.xpHoje += x;

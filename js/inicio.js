@@ -70,7 +70,7 @@ var Inicio = (function () {
           el('span', { class: 'mes-escudo' }, UI.icone('escudo')),
           el('div', { class: 'mes-indice-texto' }, [
             el('strong', { class: 'mes-faixa', text: f ? f.nome : 'Sem índice ainda' }),
-            el('span', { text: f ? Math.floor(s.pct) + '% batidas · XP do mês ' + mult(f.mult) : 'Aparece quando a primeira meta do mês for decidida.' })
+            el('span', { text: f ? 'Parcial: ' + Math.floor(s.pct) + '% das metas já decididas · XP do mês ' + mult(f.mult) + (s.faltam ? ' · ainda ' + s.faltam + ' em jogo' : '') : 'Aparece quando a primeira meta do mês for decidida.' })
           ])
         ]),
         el('div', { class: 'mes-numeros' }, [

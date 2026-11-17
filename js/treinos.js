@@ -45,9 +45,84 @@ var Treinos = (function () {
       return;
     }
     var t = Dados.treino(treinoId);
+    if (!atual && t.tipo === 'tcat') { registrarFeito(t); return; }
     if (!atual && t.tipo === 'musculacao' && !t.exercicios.length) { UI.aviso('Cadastre os exercícios do ' + t.nome + ' primeiro.'); location.hash = '#/treinos/' + t.id; return; }
     Dados.iniciarTreino(treinoId);
     location.hash = '#/treino';
+  }
+
+  // Tempo da corrida: "25:40", "1:05:30", "25m40s", "1h05m" ou só minutos ("40").
+  function lerDuracao(txt) {
+    var s = String(txt || '').trim().toLowerCase().replace(/\s+/g, '');
+    if (!s) return NaN;
+    var m = s.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
+    if (m) return m[3] != null ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : Number(m[1]) * 60 + Number(m[2]);
+    m = s.match(/^(?:(\d+)h)?(?:(\d+)(?:m|min))?(?:(\d+)s)?$/);
+    if (m && (m[1] || m[2] || m[3])) return (Number(m[1]) || 0) * 3600 + (Number(m[2]) || 0) * 60 + (Number(m[3]) || 0);
+    return /^\d+([.,]\d+)?$/.test(s) ? Math.round(parseFloat(s.replace(',', '.')) * 60) : NaN;
+  }
+  function textoDuracao(seg) {
+    seg = Math.round(seg || 0);
+    var h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
+    return h ? h + ':' + UI.pad(m) + ':' + UI.pad(s) : m + ':' + UI.pad(s);
+  }
+  function km(v) { return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' km'; }
+
+  // Campos de distância e tempo da corrida, com o ritmo calculado na hora.
+  function camposCorrida(segPadrao) {
+    var dist = el('input', { type: 'text', inputMode: 'decimal', placeholder: 'Ex.: 5,2' });
+    var tempo = el('input', { type: 'text', value: segPadrao ? textoDuracao(segPadrao) : '', placeholder: 'Ex.: 28:30 ou 1:05:00' });
+    var pace = el('strong', { class: 'pace-previa', text: '—' });
+    function atualizar() {
+      var d = UI.lerValor(dist.value), s = lerDuracao(tempo.value);
+      tempo.classList.toggle('invalido', !!tempo.value.trim() && isNaN(s));
+      pace.textContent = d > 0 && s > 0 ? ritmo(s, d) : '—';
+    }
+    dist.addEventListener('input', atualizar); tempo.addEventListener('input', atualizar);
+    return {
+      dist: dist, tempo: tempo,
+      nos: [el('div', { class: 'campos-linha' }, [UI.campo('Distância (km)', dist), UI.campo('Tempo', tempo, 'minutos:segundos ou horas:minutos:segundos')]),
+        el('div', { class: 'pace-linha' }, [el('span', { text: 'Ritmo (pace)' }), pace])],
+      ler: function () { return { km: UI.lerValor(dist.value), segundos: lerDuracao(tempo.value) }; }
+    };
+  }
+  // Depois de registrar uma corrida: avisa os recordes batidos.
+  function avisarRecordes(r, antes, extra) {
+    var depois = Dados.recordesCorrida(), novos = [];
+    if (depois.pace && depois.pace.registro.id === r.id && antes.pace) novos.push('melhor ritmo (' + ritmo(depois.pace.valor, 1) + ')');
+    if (depois.distancia && depois.distancia.registro.id === r.id && antes.distancia) novos.push('maior distância (' + km(depois.distancia.valor) + ')');
+    if (novos.length) UI.modal('Novo recorde!', el('div', { class: 'promocao' }, [
+      el('div', { class: 'parabens-icone' }, UI.icone('trofeu')),
+      el('div', { class: 'patente-nome', text: km(r.corrida.km) + ' em ' + textoDuracao(r.corrida.segundos) }),
+      el('p', { class: 'modal-desc', text: 'Recorde de ' + novos.join(' e ') + '.' })
+    ]), [{ texto: 'Continuar', classe: 'btn-primario' }]);
+    else UI.aviso(extra);
+  }
+
+  // TCAT ou corrida feita sem o cronômetro: registra já finalizado.
+  function registrarFeito(t) {
+    var data = el('input', { type: 'date', value: UI.hoje(), max: UI.hoje() });
+    var obs = el('textarea', { rows: 2, placeholder: t.tipo === 'tcat' ? 'Local, armamento, observações (opcional)' : 'Como foi? (opcional)' });
+    var c = t.tipo === 'corrida' ? camposCorrida(0) : null;
+    UI.modal(t.tipo === 'tcat' ? 'Registrar TCAT' : 'Registrar corrida', [
+      t.tipo === 'tcat' ? el('p', { class: 'modal-desc', text: 'Conta como treino do dia: vale para as metas de treino e rende ' + Dados.XP_TREINO.base + ' XP.' }) : null,
+      UI.campo('Data', data),
+      c ? c.nos : null,
+      UI.campo('Anotação', obs)
+    ], [{ texto: 'Cancelar', classe: 'btn-secundario' }, { texto: 'Registrar', classe: 'btn-primario', acao: function () {
+      var extra = { data: data.value || UI.hoje(), obs: obs.value };
+      if (c) {
+        var v = c.ler();
+        if (!(v.km > 0)) { UI.aviso('Informe a distância.'); c.dist.focus(); return false; }
+        if (!(v.segundos > 0)) { UI.aviso('Informe o tempo (ex.: 28:30).'); c.tempo.focus(); return false; }
+        extra.km = v.km; extra.segundos = v.segundos;
+      }
+      var antes = Dados.recordesCorrida();
+      var res = Dados.registrarTreinoFeito(t.id, extra);
+      var msg = t.nome + ' registrado · +' + Dados.xpDoRegistro(res.registro) + ' XP' + (res.metas.length ? ' · meta "' + res.metas[0] + '" cumprida' : '');
+      App.atualizar();
+      if (c) avisarRecordes(res.registro, antes, msg); else UI.aviso(msg);
+    } }], { icone: t.tipo === 'tcat' ? 'alvo' : 'halter', subtitulo: t.nome });
   }
 
   // ---------- Cadastro: lista de treinos ----------
@@ -69,7 +144,7 @@ var Treinos = (function () {
     } });
     UI.modal(t ? 'Editar treino' : 'Novo treino', [
       UI.campo('Nome', nome),
-      UI.campo('Tipo', tipo, t ? null : 'Musculação tem exercícios e séries; corrida registra distância e tempo.')
+      UI.campo('Tipo', tipo, t ? null : 'Musculação tem exercícios e séries; corrida registra distância, tempo e ritmo; TCAT só marca que houve treino no dia.')
     ], botoes, { icone: 'halter' });
   }
 
@@ -80,38 +155,40 @@ var Treinos = (function () {
         if (t.tipo === 'musculacao') location.hash = '#/treinos/' + t.id; else editarTreino(t.id);
       } }, [
         el('span', { class: 'treino-cartao-nome', text: t.nome }),
-        el('span', { class: 'treino-cartao-meta', text: (t.tipo === 'corrida' ? 'Corrida' : t.exercicios.length + (t.exercicios.length === 1 ? ' exercício' : ' exercícios'))
-          + ' · ' + (ultimo ? 'último em ' + UI.fmtDiaMes(ultimo.data) + ' (' + duracaoCurta(Dados.duracaoSeg(ultimo)) + ')' : 'ainda não feito') })
+        el('span', { class: 'treino-cartao-meta', text: (t.tipo === 'corrida' ? 'Corrida' : t.tipo === 'tcat' ? 'TCAT · marca o treino do dia' : t.exercicios.length + (t.exercicios.length === 1 ? ' exercício' : ' exercícios'))
+          + ' · ' + (ultimo ? 'último em ' + UI.fmtDiaMes(ultimo.data) + (t.tipo === 'tcat' ? '' : t.tipo === 'corrida' && ultimo.corrida && ultimo.corrida.km ? ' (' + km(ultimo.corrida.km) + ')' : ' (' + duracaoCurta(Dados.duracaoSeg(ultimo)) + ')') : 'ainda não feito') })
       ]),
       el('div', { class: 'treino-cartao-acoes' }, [
         el('button', { type: 'button', class: 'btn-icone', title: 'Subir', onclick: function () { Dados.moverTreino(t.id, -1); App.atualizar(); } }, UI.icone('subir')),
         el('button', { type: 'button', class: 'btn-icone', title: 'Descer', onclick: function () { Dados.moverTreino(t.id, 1); App.atualizar(); } }, UI.icone('descer')),
-        UI.botao(emCurso ? 'Continuar' : 'Iniciar', function () { iniciar(t.id); }, 'btn-primario btn-mini', 'play')
+        t.tipo === 'corrida' && !emCurso ? UI.botao('Registrar', function () { registrarFeito(t); }, 'btn-secundario btn-mini') : null,
+        t.tipo === 'tcat' ? UI.botao('Registrar', function () { registrarFeito(t); }, 'btn-primario btn-mini', 'check')
+          : UI.botao(emCurso ? 'Continuar' : 'Iniciar', function () { iniciar(t.id); }, 'btn-primario btn-mini', 'play')
       ])
     ]);
   }
 
   function linhaHistorico(r) {
-    var seg = Dados.duracaoSeg(r);
+    var corrida = r.tipo === 'corrida', seg = corrida ? Dados.segundosCorrida(r) : Dados.duracaoSeg(r), temKm = corrida && r.corrida && r.corrida.km;
     return el('button', { type: 'button', class: 'historico-linha', title: 'Ver detalhes', onclick: function () { abrirRegistro(r.id); } }, [
       el('span', { class: 'historico-data', text: UI.fmtDiaMes(r.data) }),
       el('span', { class: 'historico-corpo' }, [
         el('span', { class: 'historico-nome', text: r.nomeTreino }),
-        el('span', { class: 'historico-meta', text: r.tipo === 'corrida'
-          ? (r.corrida && r.corrida.km ? r.corrida.km.toLocaleString('pt-BR') + ' km' : 'Corrida')
-          : r.exercicios.length + (r.exercicios.length === 1 ? ' exercício' : ' exercícios') })
+        el('span', { class: 'historico-meta', text: corrida
+          ? (temKm ? km(r.corrida.km) + ' · ' + ritmo(seg, r.corrida.km) : 'Corrida')
+          : r.tipo === 'tcat' ? 'TCAT' : r.exercicios.length + (r.exercicios.length === 1 ? ' exercício' : ' exercícios') })
       ]),
-      el('span', { class: 'historico-tempo', text: duracaoCurta(seg) })
+      el('span', { class: 'historico-tempo', text: r.tipo === 'tcat' ? '✓' : corrida ? textoDuracao(seg) : duracaoCurta(seg) })
     ]);
   }
 
   function abrirRegistro(id) {
-    var r = Dados.registro(id), seg = Dados.duracaoSeg(r);
+    var r = Dados.registro(id), corrida = r.tipo === 'corrida', seg = corrida ? Dados.segundosCorrida(r) : Dados.duracaoSeg(r);
     var corpo = [
-      el('div', { class: 'registro-resumo' }, [
-        UI.metrica('Duração', UI.fmtDuracao(seg)),
-        r.tipo === 'corrida' ? UI.metrica('Distância', r.corrida && r.corrida.km ? r.corrida.km.toLocaleString('pt-BR') + ' km' : '—') : UI.metrica('Exercícios', String(r.exercicios.length)),
-        r.tipo === 'corrida' && r.corrida && r.corrida.km ? UI.metrica('Ritmo', ritmo(seg, r.corrida.km)) : UI.metrica('XP', '+' + Dados.xpDoRegistro(r))
+      el('div', { class: 'registro-resumo' }, r.tipo === 'tcat' ? [UI.metrica('Treino', 'TCAT'), UI.metrica('XP', '+' + Dados.xpDoRegistro(r))] : [
+        UI.metrica(corrida ? 'Tempo' : 'Duração', corrida ? textoDuracao(seg) : UI.fmtDuracao(seg)),
+        corrida ? UI.metrica('Distância', r.corrida && r.corrida.km ? km(r.corrida.km) : '—') : UI.metrica('Exercícios', String(r.exercicios.length)),
+        corrida && r.corrida && r.corrida.km ? UI.metrica('Ritmo', ritmo(seg, r.corrida.km)) : UI.metrica('XP', '+' + Dados.xpDoRegistro(r))
       ])
     ];
     if (r.exercicios.length) corpo.push(el('div', { class: 'lista-feitos' }, r.exercicios.map(function (x) {
@@ -136,7 +213,7 @@ var Treinos = (function () {
     raiz.appendChild(el('div', { class: 'pagina-topo' }, [
       el('div', null, [
         el('h1', { class: 'pagina-titulo', text: 'Treinos' }),
-        el('div', { class: 'pagina-subtitulo', text: 'Cadastre seus treinos de musculação e corrida. Para treinar, use Iniciar.' })
+        el('div', { class: 'pagina-subtitulo', text: 'Cadastre seus treinos de musculação, corrida e TCAT. Para treinar, use Iniciar; corrida feita e TCAT, use Registrar.' })
       ]),
       el('div', { class: 'pagina-acoes' }, UI.botao('Novo treino', function () { editarTreino(); }, 'btn-primario', 'mais'))
     ]));
@@ -147,6 +224,23 @@ var Treinos = (function () {
       el('div', { class: 'vazio-acoes' }, UI.botao('Criar o primeiro treino', function () { editarTreino(); }, 'btn-primario'))
     ]));
     else raiz.appendChild(el('div', { class: 'lista-treinos' }, lista.map(cartaoTreino)));
+
+    var rec = Dados.recordesCorrida();
+    if (rec.distancia) {
+      var cartaoRec = function (rotulo, valor, r) {
+        return el('div', { class: 'recorde-corrida' }, [UI.icone('trofeu'), el('span', { class: 'recorde-texto' }, [
+          el('span', { class: 'recorde-rotulo', text: rotulo }), el('strong', { text: valor }),
+          el('small', { text: r ? UI.fmtData(r.data) + (r.corrida && r.corrida.km ? ' · ' + km(r.corrida.km) + ' em ' + textoDuracao(Dados.segundosCorrida(r)) : '') : '' })])]);
+      };
+      raiz.appendChild(el('section', { class: 'painel' }, [
+        el('h2', { class: 'secao-titulo', text: 'Recordes de corrida' }),
+        el('div', { class: 'recordes-corrida' }, [
+          cartaoRec('Melhor ritmo', rec.pace ? ritmo(rec.pace.valor, 1) : '—', rec.pace && rec.pace.registro),
+          cartaoRec('Maior distância', km(rec.distancia.valor), rec.distancia.registro),
+          cartaoRec('Corrida mais longa', rec.tempo ? textoDuracao(rec.tempo.valor) : '—', rec.tempo && rec.tempo.registro)
+        ])
+      ]));
+    }
 
     if (hist.length) raiz.appendChild(el('section', { class: 'painel' }, [
       el('h2', { class: 'secao-titulo' }, ['Histórico', el('span', { class: 'secao-contagem', text: hist.length })]),
@@ -339,7 +433,7 @@ var Treinos = (function () {
   function finalizar(r) {
     var t = Dados.treino(r.treinoId), corrida = r.tipo === 'corrida';
     var faltam = !corrida && t ? t.exercicios.filter(function (e) { return !Dados.feitoNoRegistro(r, e.id); }) : [];
-    var km = el('input', { type: 'text', inputMode: 'decimal', placeholder: 'Ex.: 5,2' });
+    var c = corrida ? camposCorrida(Dados.duracaoSeg(r)) : null;
     var obs = el('textarea', { rows: 2, placeholder: 'Como foi o treino? (opcional)' });
     UI.modal('Finalizar treino', [
       el('div', { class: 'registro-resumo' }, [
@@ -348,7 +442,7 @@ var Treinos = (function () {
         UI.metrica('XP', '+' + Dados.xpDoRegistro(r))
       ]),
       faltam.length ? el('p', { class: 'aviso-falta', text: 'Ficaram de fora: ' + faltam.map(function (e) { return e.nome; }).join(', ') + '.' }) : null,
-      corrida ? UI.campo('Distância (km)', km) : null,
+      c ? c.nos : null,
       UI.campo('Anotação', obs)
     ], [
       { texto: 'Cancelar treino', classe: 'btn-perigo btn-esquerda', acao: function () {
@@ -360,13 +454,22 @@ var Treinos = (function () {
       } },
       { texto: 'Continuar treinando', classe: 'btn-secundario' },
       { texto: 'Finalizar', classe: 'btn-primario', acao: function () {
-        var marcadas = Dados.finalizarTreino(r.id, { km: corrida ? km.value : null, obs: obs.value });
-        UI.aviso('Treino finalizado · +' + Dados.xpDoRegistro(r) + ' XP' + (marcadas.length ? ' · meta "' + marcadas[0] + '" cumprida' : ''));
+        var extra = { obs: obs.value };
+        if (c) {
+          var v = c.ler();
+          if (!(v.km > 0)) { UI.aviso('Informe a distância.'); c.dist.focus(); return false; }
+          if (c.tempo.value.trim() && !(v.segundos > 0)) { UI.aviso('Tempo inválido. Use, por exemplo, 28:30.'); c.tempo.focus(); return false; }
+          extra.km = v.km; extra.segundos = v.segundos;
+        }
+        var antes = corrida ? Dados.recordesCorrida() : null;
+        var marcadas = Dados.finalizarTreino(r.id, extra);
+        var msg = 'Treino finalizado · +' + Dados.xpDoRegistro(r) + ' XP' + (marcadas.length ? ' · meta "' + marcadas[0] + '" cumprida' : '');
         location.hash = '#/inicio';
         App.atualizar();
+        if (corrida) avisarRecordes(r, antes, msg); else UI.aviso(msg);
       } }
     ], { icone: 'halter', subtitulo: r.nomeTreino });
-    if (corrida) km.focus();
+    if (c) c.dist.focus();
   }
 
   function topoExecucao(r) {
@@ -545,7 +648,7 @@ var Treinos = (function () {
         var ultimo = Dados.historico(t.id)[0];
         return el('button', { type: 'button', class: 'iniciar-treino', onclick: function () { iniciar(t.id); } }, [
           el('span', { class: 'iniciar-treino-nome', text: t.nome }),
-          el('span', { class: 'iniciar-treino-meta', text: ultimo ? 'Último: ' + UI.haQuanto(ultimo.data).toLowerCase() : 'Ainda não feito' })
+          el('span', { class: 'iniciar-treino-meta', text: (t.tipo === 'tcat' ? 'Toque para registrar · ' : '') + (ultimo ? 'Último: ' + UI.haQuanto(ultimo.data).toLowerCase() : 'Ainda não feito') })
         ]);
       })) : el('p', { class: 'modal-desc', text: 'Cadastre seus treinos (A, B, C… e corrida) na aba Treinos para registrar aqui o que fizer na academia.' })
     ]);

@@ -157,6 +157,9 @@ var Dados = (function () {
   function inicioProjeto() { return db.perfil.inicio || INICIO_PADRAO; }
   // Dia do projeto: 1 no dia do início. Antes dele, negativo/zero (quantos dias faltam).
   function diaDoProjeto(hoje) { return UI.diasEntre(inicioProjeto(), hoje || UI.hoje()) + 1; }
+  // Nada antes do início do projeto conta: nem XP, nem metas cumpridas ou falhadas.
+  function antesDoInicio(iso) { return !iso || iso < inicioProjeto(); }
+  function maior(a, b) { return a > b ? a : b; }
   function atualizarPerfil(campos) {
     if (campos.inicio !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(campos.inicio || '')) db.perfil.inicio = campos.inicio;
     if (campos.nome != null) db.perfil.nome = texto(campos.nome);
@@ -166,7 +169,8 @@ var Dados = (function () {
   }
 
   // ---------- Treinos (cadastro) ----------
-  var TIPOS_TREINO = [['musculacao', 'Musculação'], ['corrida', 'Corrida']];
+  // tcat: Treinamento de Tiro Continuado (obrigatório no serviço). Só marca que houve treino no dia.
+  var TIPOS_TREINO = [['musculacao', 'Musculação'], ['corrida', 'Corrida'], ['tcat', 'TCAT (Tiro Continuado)']];
   var ROTULOS_SERIE = [['aquecimento', 'Aquecimento'], ['preparacao', 'Preparação'], ['valida', 'Válida']];
   var EQUIPAMENTOS = [['livre', 'Peso livre'], ['maquina', 'Máquina'], ['corpo', 'Peso do corpo']]; // corpo: sem carga, só repetições
   var PASSO_MAQUINA = 5; // nas máquinas o peso sobe de 5 em 5 kg
@@ -214,7 +218,7 @@ var Dados = (function () {
     var t = id ? treino(id) : null;
     if (!t) { t = { id: novoId(), ordem: proximaOrdem(db.treinos), arquivado: false, exercicios: [], criadoEm: Date.now() }; db.treinos.push(t); }
     t.nome = texto(campos.nome) || 'Treino';
-    if (campos.tipo) t.tipo = campos.tipo === 'corrida' ? 'corrida' : 'musculacao';
+    if (campos.tipo) t.tipo = campos.tipo === 'corrida' || campos.tipo === 'tcat' ? campos.tipo : 'musculacao';
     if (!t.tipo) t.tipo = 'musculacao';
     salvar();
     return t;
@@ -421,10 +425,41 @@ var Dados = (function () {
     extra = extra || {};
     var antes = db.habitos.filter(function (h) { return h.medida === 'treinos' && !progressoHabito(h, r.data).completo; });
     r.fim = Date.now();
-    if (extra.km != null && r.tipo === 'corrida') r.corrida = { km: numero(extra.km, 0, 500, 0) };
+    if (r.tipo === 'corrida') r.corrida = dadosCorrida(extra, duracaoSeg(r));
     if (extra.obs != null) r.obs = texto(extra.obs);
     salvar();
     return antes.filter(function (h) { return progressoHabito(h, r.data).completo; }).map(function (h) { return h.titulo; });
+  }
+  // Corrida: distância (km) e tempo informado (segundos); sem tempo, vale o do cronômetro.
+  function dadosCorrida(extra, cronometro) {
+    var s = Number(extra.segundos);
+    return { km: numero(extra.km, 0, 500, 0), segundos: isFinite(s) && s > 0 ? Math.round(s) : cronometro || 0 };
+  }
+  // Treino registrado direto, já finalizado (TCAT, ou uma corrida feita sem o cronômetro).
+  function registrarTreinoFeito(treinoId, extra) {
+    var t = treino(treinoId);
+    extra = extra || {};
+    var data = extra.data || UI.hoje();
+    var antes = db.habitos.filter(function (h) { return h.medida === 'treinos' && !progressoHabito(h, data).completo; });
+    var agora = Date.now(), seg = t.tipo === 'corrida' ? Math.max(0, Math.round(Number(extra.segundos) || 0)) : 0;
+    var r = { id: novoId(), treinoId: t.id, nomeTreino: t.nome, tipo: t.tipo, data: data, inicio: agora - seg * 1000, fim: agora, exercicios: [], corrida: null, obs: texto(extra.obs), avulso: true };
+    if (t.tipo === 'corrida') r.corrida = dadosCorrida(extra, 0);
+    db.registros.push(r);
+    salvar();
+    return { registro: r, metas: antes.filter(function (h) { return progressoHabito(h, data).completo; }).map(function (h) { return h.titulo; }) };
+  }
+  function segundosCorrida(r) { return r.corrida && r.corrida.segundos ? r.corrida.segundos : duracaoSeg(r); }
+  // Recordes de corrida: melhor ritmo (corridas de 1 km ou mais) e maior distância. ignorar: id de um registro.
+  function recordesCorrida(ignorar) {
+    var rec = { pace: null, distancia: null, tempo: null };
+    historico().forEach(function (r) {
+      if (r.tipo !== 'corrida' || r.id === ignorar || !r.corrida || !(r.corrida.km > 0)) return;
+      var seg = segundosCorrida(r), p = seg / r.corrida.km;
+      if (r.corrida.km >= 1 && seg > 0 && (!rec.pace || p < rec.pace.valor)) rec.pace = { valor: p, registro: r };
+      if (!rec.distancia || r.corrida.km > rec.distancia.valor) rec.distancia = { valor: r.corrida.km, registro: r };
+      if (seg > 0 && (!rec.tempo || seg > rec.tempo.valor)) rec.tempo = { valor: seg, registro: r };
+    });
+    return rec;
   }
   function cancelarTreino(registroId) { db.registros = db.registros.filter(function (r) { return r.id !== registroId; }); sincronizarMetasPR(); salvar(); }
   function excluirRegistro(id) { cancelarTreino(id); }
@@ -444,6 +479,7 @@ var Dados = (function () {
   function xpDosTreinos(hoje) {
     var r = { xp: 0, hoje: 0, feitos: 0, porMes: {} };
     historico().forEach(function (x) {
+      if (antesDoInicio(x.data)) return;
       var v = xpDoRegistro(x);
       r.xp += v; r.feitos++;
       somarMes(r.porMes, x.data, v);
@@ -550,13 +586,14 @@ var Dados = (function () {
       for (var d = db.dieta.desde, i = 0; d < hoje && i < 3660; d = UI.somarDias(d, 1), i++) dias[d] = 1;
     }
     Object.keys(dias).forEach(function (d) {
+      if (antesDoInicio(d)) return;
       var s = resumoDieta(d, hoje);
       r.xp += s.xp; r.seguidas += s.dieta;
       somarMes(r.porMes, d, s.xp);
       if (s.perdeu) r.perdidas += s.faltam;
       if (d === hoje) r.hoje += s.xp;
     });
-    db.medidas.forEach(function (m) { r.xp += XP_DIETA.medidas; somarMes(r.porMes, m.data, XP_DIETA.medidas); if (m.data === hoje) r.hoje += XP_DIETA.medidas; });
+    db.medidas.forEach(function (m) { if (antesDoInicio(m.data)) return; r.xp += XP_DIETA.medidas; somarMes(r.porMes, m.data, XP_DIETA.medidas); if (m.data === hoje) r.hoje += XP_DIETA.medidas; });
     return r;
   }
   // Adesão de uma semana (segunda a domingo) que contém o dia.
@@ -852,7 +889,8 @@ var Dados = (function () {
   }
   // Progresso no período (dia, semana ou mês) que contém o dia.
   function progressoHabito(h, iso) {
-    var p = periodoDoHabito(h, iso), v = medir(h, p.inicio, p.fim);
+    // Só conta o que foi feito a partir do início do projeto (um mês que começou antes conta a partir dele).
+    var p = periodoDoHabito(h, iso), v = medir(h, maior(p.inicio, inicioProjeto()), p.fim);
     return { feitas: v, alvo: h.alvo || 1, completo: v >= (h.alvo || 1) - 1e-9, periodo: p, pct: Math.min(100, v / (h.alvo || 1) * 100) };
   }
   function habitoCumpridoNoDia(h, iso) { return progressoHabito(h, iso).completo; }
@@ -861,7 +899,7 @@ var Dados = (function () {
     if (h.periodo !== 'dia') return 0;
     var d = UI.hoje(), n = 0;
     for (var i = 0; i < 400; i++, d = UI.somarDias(d, -1)) {
-      if (d < h.desde) break;
+      if (d < h.desde || antesDoInicio(d)) break;
       if (!habitoValeNoDia(h, d)) continue;
       if (habitoCumpridoNoDia(h, d)) n++; else if (i > 0) break;
     }
@@ -869,7 +907,7 @@ var Dados = (function () {
   }
   // Inícios dos períodos de uma meta, da criação até hoje.
   function periodosAteHoje(h) {
-    var hoje = UI.hoje(), l = [], d = periodoDoHabito(h, h.desde || hoje).inicio;
+    var hoje = UI.hoje(), l = [], d = periodoDoHabito(h, maior(h.desde || hoje, inicioProjeto())).inicio;
     for (var i = 0; d <= hoje && i < 3700; i++) {
       if (h.periodo === 'dia') { if (habitoValeNoDia(h, d)) l.push(d); d = UI.somarDias(d, 1); }
       else if (h.periodo === 'semana') { l.push(d); d = UI.somarDias(d, 7); }
@@ -932,7 +970,7 @@ var Dados = (function () {
       return ok ? 'batida' : pFim < hoje ? 'falhou' : 'falta';
     }
     db.habitos.forEach(function (h) {
-      var desde = h.desde || ini;
+      var desde = maior(h.desde || ini, inicioProjeto());
       if (h.periodo === 'dia') {
         for (var d = ini; d <= fim; d = UI.somarDias(d, 1)) {
           if (d < desde || !habitoValeNoDia(h, d)) continue;
@@ -954,7 +992,7 @@ var Dados = (function () {
     });
     db.metas.forEach(function (m) {
       var data = m.concluida ? m.dataConclusao : m.prazo;
-      if (!data || data.slice(0, 7) !== mes) return;
+      if (!data || data.slice(0, 7) !== mes || antesDoInicio(data)) return;
       var area = m.tipo === 'pr' ? 'pr' : m.tipo === 'medida' ? 'medida' : m.area === 'estudos' ? 'estudo' : m.area === 'habitos' ? 'habito' : m.area;
       contar(area, m.concluida ? 'batida' : m.prazo < hoje ? 'falhou' : 'falta');
     });
@@ -973,7 +1011,7 @@ var Dados = (function () {
       if (h.periodo === 'dia') {
         for (var i = 0; i < 7; i++) {
           var d = UI.somarDias(seg, i);
-          if (d > hoje || d < h.desde || !habitoValeNoDia(h, d)) continue;
+          if (d > hoje || d < h.desde || antesDoInicio(d) || !habitoValeNoDia(h, d)) continue;
           r.possiveis++;
           if (habitoCumpridoNoDia(h, d)) r.feitas++;
         }
@@ -992,14 +1030,14 @@ var Dados = (function () {
   return {
     get db() { return db; },
     salvar: salvar, substituir: substituir, exportar: exportar, importar: importar, limpar: limpar, semDados: semDados, ehDoPrograma: ehDoPrograma,
-    atualizarPerfil: atualizarPerfil, inicioProjeto: inicioProjeto, diaDoProjeto: diaDoProjeto,
+    atualizarPerfil: atualizarPerfil, inicioProjeto: inicioProjeto, diaDoProjeto: diaDoProjeto, antesDoInicio: antesDoInicio,
     TIPOS_TREINO: TIPOS_TREINO, ROTULOS_SERIE: ROTULOS_SERIE, seriesPadrao: seriesPadrao, padraoSerie: padraoSerie, salvarPadroesSerie: salvarPadroesSerie, restaurarPadroesSerie: restaurarPadroesSerie, faixaValida: faixaValida, passouDaFaixa: passouDaFaixa, EQUIPAMENTOS: EQUIPAMENTOS, PASSO_MAQUINA: PASSO_MAQUINA,
     treino: treino, treinos: treinos, salvarTreino: salvarTreino, excluirTreino: excluirTreino, moverTreino: moverTreino,
     exercicio: exercicio, exercicios: exercicios, salvarExercicio: salvarExercicio, excluirExercicio: excluirExercicio, moverExercicio: moverExercicio,
     cargaDaSerie: cargaDaSerie,
     registro: registro, treinoEmAndamento: treinoEmAndamento, historico: historico, iniciarTreino: iniciarTreino, feitoNoRegistro: feitoNoRegistro,
     concluirExercicio: concluirExercicio, desfazerExercicio: desfazerExercicio, finalizarTreino: finalizarTreino, cancelarTreino: cancelarTreino,
-    excluirRegistro: excluirRegistro, duracaoSeg: duracaoSeg, ultimoResultado: ultimoResultado, XP_TREINO: XP_TREINO, xpDoRegistro: xpDoRegistro, xpDosTreinos: xpDosTreinos,
+    excluirRegistro: excluirRegistro, duracaoSeg: duracaoSeg, registrarTreinoFeito: registrarTreinoFeito, segundosCorrida: segundosCorrida, recordesCorrida: recordesCorrida, ultimoResultado: ultimoResultado, XP_TREINO: XP_TREINO, xpDoRegistro: xpDoRegistro, xpDosTreinos: xpDosTreinos,
     XP_DIETA: XP_DIETA, refeicoes: refeicoes, refeicao: refeicao, salvarRefeicao: salvarRefeicao, excluirRefeicao: excluirRefeicao,
     moverRefeicao: moverRefeicao, importarPlano: importarPlano, treinouNoDia: treinouNoDia,
     refeicoesDoDia: refeicoesDoDia, registroRefeicao: registroRefeicao, registrarRefeicao: registrarRefeicao, desfazerRefeicao: desfazerRefeicao,
